@@ -6,6 +6,7 @@ use crate::xml_builder::XmlBuilder;
 mod http;
 pub mod parse;
 mod extract;
+pub mod voucher_parser;
 
 use crate::client::extract::{extract_groups_from_xml, extract_ledgers_from_xml, extract_stock_items_from_xml, extract_vouchers_from_xml};
 
@@ -142,6 +143,9 @@ impl TallyClient {
         // Day Book export; FETCHLIST not needed/used
         let xml = XmlBuilder::create_export_request("DATA", "Voucher", None)?;
         let resp = self.post_xml(&xml)?;
+        // save resp to file
+        std::fs::write("vouchers.xml", resp.clone()).unwrap();
+        println!("{}", resp);
         Ok(extract_vouchers_from_xml(&resp))
     }
 }

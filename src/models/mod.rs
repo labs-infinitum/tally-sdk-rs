@@ -11,5 +11,5 @@ pub use group::Group;
 pub use unit::Unit;
 pub use stock_group::StockGroup;
 pub use stock_item::StockItem;
-pub use voucher::{Voucher, VoucherEntry};
+pub use voucher::{Voucher, VoucherEntry, Item, GstRateDetail, BatchAllocation, AccountingAllocation};
 pub use item_invoice::ItemInvoice;
