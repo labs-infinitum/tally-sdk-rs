@@ -2,9 +2,8 @@ mod common;
 
 use common::{
     active_company_label, arg_value, create_client_from_env, format_yyyymmdd, has_flag,
-    resolve_financial_period,
+    resolve_financial_period, summarize_entry, summarize_voucher,
 };
-use tally_sdk_rust::{Voucher, VoucherEntry};
 
 fn main() {
     let client = create_client_from_env();
@@ -34,40 +33,6 @@ fn main() {
             }
         }
     }
-}
-
-fn summarize_voucher(voucher: &Voucher) -> String {
-    let voucher_number = voucher.voucher_number.as_deref().unwrap_or("-");
-    let party = voucher.party_ledger_name.as_deref().unwrap_or("-");
-    let amount = voucher
-        .entries
-        .iter()
-        .find(|entry| entry.is_party_ledger)
-        .map(|entry| entry.amount)
-        .or(voucher.amount.map(|amount| amount.abs()))
-        .unwrap_or(0.0);
-
-    format!(
-        "{} | {} | no. {} | party {} | amount {:.2}",
-        format_yyyymmdd(&voucher.date_yyyymmdd),
-        voucher.voucher_type,
-        voucher_number,
-        party,
-        amount
-    )
-}
-
-fn summarize_entry(entry: &VoucherEntry) -> String {
-    let side = if entry.is_debit { "Dr" } else { "Cr" };
-    let party = if entry.is_party_ledger {
-        " [Party]"
-    } else {
-        ""
-    };
-    format!(
-        "{} | {} {:.2}{}",
-        entry.ledger_name, side, entry.amount, party
-    )
 }
 
 fn resolve_day_book_period(client: &tally_sdk_rust::TallyClient) -> (String, String) {

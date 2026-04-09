@@ -2,7 +2,7 @@
 
 use chrono::{Datelike, Local};
 use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::TallyClient;
+use tally_sdk_rust::{TallyClient, Voucher, VoucherEntry};
 
 pub fn create_client_from_env() -> TallyClient {
     let cfg = TallyConfig {
@@ -74,6 +74,46 @@ pub fn format_yyyymmdd(date: &str) -> String {
     } else {
         date.to_string()
     }
+}
+
+pub fn format_amount(value: Option<f64>) -> String {
+    value
+        .map(|amount| format!("{amount:.2}"))
+        .unwrap_or_else(|| "-".into())
+}
+
+pub fn summarize_voucher(voucher: &Voucher) -> String {
+    let voucher_number = voucher.voucher_number.as_deref().unwrap_or("-");
+    let party = voucher.party_ledger_name.as_deref().unwrap_or("-");
+    let amount = voucher
+        .entries
+        .iter()
+        .find(|entry| entry.is_party_ledger)
+        .map(|entry| entry.amount)
+        .or(voucher.amount.map(|amount| amount.abs()))
+        .unwrap_or(0.0);
+
+    format!(
+        "{} | {} | no. {} | party {} | amount {:.2}",
+        format_yyyymmdd(&voucher.date_yyyymmdd),
+        voucher.voucher_type,
+        voucher_number,
+        party,
+        amount
+    )
+}
+
+pub fn summarize_entry(entry: &VoucherEntry) -> String {
+    let side = if entry.is_debit { "Dr" } else { "Cr" };
+    let party = if entry.is_party_ledger {
+        " [Party]"
+    } else {
+        ""
+    };
+    format!(
+        "{} | {} {:.2}{}",
+        entry.ledger_name, side, entry.amount, party
+    )
 }
 
 fn current_financial_year() -> (String, String) {

@@ -1,7 +1,7 @@
 mod common;
 
 use common::{
-    active_company_label, create_client_from_env, format_yyyymmdd, has_flag,
+    active_company_label, create_client_from_env, format_amount, format_yyyymmdd, has_flag,
     resolve_financial_period,
 };
 
@@ -33,10 +33,4 @@ fn main() {
             format_amount(row.credit)
         );
     }
-}
-
-fn format_amount(value: Option<f64>) -> String {
-    value
-        .map(|amount| format!("{amount:.2}"))
-        .unwrap_or_else(|| "-".into())
 }
