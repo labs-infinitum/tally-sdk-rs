@@ -1,13 +1,17 @@
+use tally_sdk_rust::client::{parse_simple_response, TallyClient};
 use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::{Group, Ledger, StockItem, ItemInvoice};
-use tally_sdk_rust::client::{TallyClient, parse_simple_response};
+use tally_sdk_rust::models::{ItemInvoice, Ledger, StockItem};
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
         host: std::env::var("TALLY_HOST").unwrap_or_else(|_| "localhost".into()),
-        port: std::env::var("TALLY_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(9000),
+        port: std::env::var("TALLY_PORT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(9000),
         timeout_secs: 30,
         retry_attempts: 2,
+        current_company: std::env::var("TALLY_COMPANY").ok(),
         tally_net_account: None,
         tally_net_password: None,
     };
@@ -16,7 +20,11 @@ fn make_client() -> TallyClient {
 
 fn ensure_party_ledger(client: &TallyClient, name: &str) {
     // Create a simple party ledger under 'Sundry Creditors' if not exists
-    let exists = client.get_ledgers().unwrap_or_default().iter().any(|(n, _)| n == name);
+    let exists = client
+        .get_ledgers()
+        .unwrap_or_default()
+        .iter()
+        .any(|(n, _)| n == name);
     if !exists {
         let ledger = Ledger {
             name: name.to_string(),
@@ -75,12 +83,88 @@ fn ensure_party_ledger(client: &TallyClient, name: &str) {
             gst_rate_valuation_type: None,
             gst_rate: None,
         };
-        let _ = client.create_ledger_debug(&ledger).expect("create party ledger");
+        let _ = client
+            .create_ledger_debug(&ledger)
+            .expect("create party ledger");
+    }
+}
+
+fn ensure_purchase_ledger(client: &TallyClient, name: &str) {
+    let exists = client
+        .get_ledgers()
+        .unwrap_or_default()
+        .iter()
+        .any(|(n, _)| n == name);
+    if !exists {
+        let ledger = Ledger {
+            name: name.to_string(),
+            parent: Some("Purchase Accounts".into()),
+            alias: None,
+            opening_balance: None,
+            mailing_name: None,
+            mailing_address: None,
+            mailing_state: None,
+            mailing_country: None,
+            mailing_pincode: None,
+            income_tax_number: None,
+            gst_applicable: None,
+            appropriate_for: None,
+            gst_appropriate_to: None,
+            excise_alloc_type: None,
+            gst_type_of_supply: None,
+            gst_duty_head: None,
+            rate_of_tax_calculation: None,
+            tax_type: None,
+            bill_credit_period_days: None,
+            is_billwise_on: None,
+            is_credit_days_chk_on: None,
+            account_number: None,
+            ifsc_code: None,
+            bank_name: None,
+            bank_account_holder_name: None,
+            swift_code: None,
+            branch_name: None,
+            bank_bsr_code: None,
+            od_limit: None,
+            default_transaction_type: None,
+            payment_favouring: None,
+            transaction_name: None,
+            set_as_default: None,
+            cheque_cross_comment: None,
+            virtual_payment_address: None,
+            beneficiary_code: None,
+            is_tds_applicable: None,
+            tds_deductee_type: None,
+            deduct_tds_in_same_voucher: None,
+            tds_applicable: None,
+            tds_category_date: None,
+            tds_category_name: None,
+            hsn_applicable_from: None,
+            hsn_code: None,
+            hsn_description: None,
+            hsn_classification_name: None,
+            hsn_source_of_details: None,
+            gst_applicable_from: None,
+            gst_taxability: None,
+            gst_source_of_details: None,
+            gst_classification_name: None,
+            gst_state_name: None,
+            gst_rate_duty_head: None,
+            gst_rate_valuation_type: None,
+            gst_rate: None,
+        };
+        let _ = client
+            .create_ledger_debug(&ledger)
+            .expect("create purchase ledger");
     }
 }
 
 fn ensure_stock_item(client: &TallyClient, name: &str) {
-    let exists = client.get_stock_items().unwrap_or_default().iter().any(|(n, _)| n == name);
+    let exists = client
+        .get_stock_items()
+        .unwrap_or_default()
+        .iter()
+        .any(|(n, _)| n == name);
     if !exists {
         let item = StockItem {
             name: name.to_string(),
@@ -106,12 +190,19 @@ fn ensure_stock_item(client: &TallyClient, name: &str) {
             gst_rate_valuation_type: Some("Based on Value".into()),
             gst_rate: Some(18.0),
         };
-        let _ = client.create_stock_item_debug(&item).expect("create stock item");
+        let _ = client
+            .create_stock_item_debug(&item)
+            .expect("create stock item");
     }
 }
 
 fn counters(v: &serde_json::Value) -> (i64, i64, i64) {
-    let get = |k: &str| v.get(k).and_then(|x| x.as_str()).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+    let get = |k: &str| {
+        v.get(k)
+            .and_then(|x| x.as_str())
+            .and_then(|s| s.parse::<i64>().ok())
+            .unwrap_or(0)
+    };
     (get("CREATED"), get("ALTERED"), get("EXCEPTIONS"))
 }
 
@@ -119,13 +210,23 @@ fn counters(v: &serde_json::Value) -> (i64, i64, i64) {
 fn purchase_voucher_with_new_party_and_item() {
     let client = make_client();
     client.test_connection().expect("connection");
+    if client
+        .active_company_name()
+        .expect("active company lookup")
+        .is_none()
+    {
+        eprintln!("Skipping purchase voucher test: no active Tally company loaded and TALLY_COMPANY is not set");
+        return;
+    }
 
     // Fudged unique names
     let ts = chrono::Utc::now().timestamp();
     let party_name = format!("SDK Supplier {}", ts);
     let item_name = format!("SDK Item {}", ts);
+    let purchase_ledger_name = format!("SDK Purchase {}", ts);
 
     ensure_party_ledger(&client, &party_name);
+    ensure_purchase_ledger(&client, &purchase_ledger_name);
     ensure_stock_item(&client, &item_name);
 
     // Build ItemInvoice for Purchase on 2025-04-02 with 10 units at 50 each
@@ -133,7 +234,7 @@ fn purchase_voucher_with_new_party_and_item() {
         voucher_type: "Purchase".into(),
         date_yyyymmdd: "20250402".into(),
         party_ledger_name: party_name.clone(),
-        line_ledger_name: "Purchase A/c".into(),
+        line_ledger_name: purchase_ledger_name.clone(),
         item_name: item_name.clone(),
         quantity: 10.0,
         unit: "NOS".into(),
@@ -156,15 +257,21 @@ fn purchase_voucher_with_new_party_and_item() {
     };
 
     // Create voucher and verify
-    let xml = tally_sdk_rust::xml_builder::XmlBuilder::create_item_invoice_request(&vch.to_map()).expect("build xml");
-    println!("\n==== XML Voucher Request ===\n{}\n============================\n", xml);
+    let xml = tally_sdk_rust::xml_builder::XmlBuilder::create_item_invoice_request(&vch.to_map())
+        .expect("build xml");
+    println!(
+        "\n==== XML Voucher Request ===\n{}\n============================\n",
+        xml
+    );
 
     let resp = client.post_xml(&xml).expect("post voucher");
     println!("\n==== Raw Response ===\n{}\n====================\n", resp);
     let parsed = parse_simple_response(&resp);
     let (created, altered, exceptions) = counters(&parsed);
     assert_eq!(exceptions, 0, "voucher creation exceptions: {:?}", parsed);
-    assert!(created > 0 || altered > 0, "voucher not created/altered: {:?}", parsed);
+    assert!(
+        created > 0 || altered > 0,
+        "voucher not created/altered: {:?}",
+        parsed
+    );
 }
-
-

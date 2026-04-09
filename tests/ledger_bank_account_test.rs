@@ -5,9 +5,13 @@ use tally_sdk_rust::TallyClient;
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
         host: std::env::var("TALLY_HOST").unwrap_or_else(|_| "localhost".into()),
-        port: std::env::var("TALLY_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(9000),
+        port: std::env::var("TALLY_PORT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(9000),
         timeout_secs: 30,
         retry_attempts: 2,
+        current_company: std::env::var("TALLY_COMPANY").ok(),
         tally_net_account: None,
         tally_net_password: None,
     };
@@ -111,6 +115,14 @@ fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
 fn create_bank_account_ledger_full_details() {
     let client = make_client();
     client.test_connection().expect("connection");
+    if client
+        .active_company_name()
+        .expect("active company lookup")
+        .is_none()
+    {
+        eprintln!("Skipping ledger creation test: no active Tally company loaded and TALLY_COMPANY is not set");
+        return;
+    }
 
     let ledger = build_bank_account_ledger();
     // verify before
@@ -135,9 +147,15 @@ fn create_bank_account_ledger_full_details() {
 
     if !existed_before {
         // Ensure success (created/altered) or at least existence now, and no exceptions
-        assert!(exceptions == 0, "Tally returned exceptions for creation: {:?}", resp);
-        assert!(created > 0 || altered > 0 || exists_after, "Expected CREATED/ALTERED counters or to find ledger after creation; resp={:?}", resp);
+        assert!(
+            exceptions == 0,
+            "Tally returned exceptions for creation: {:?}",
+            resp
+        );
+        assert!(
+            created > 0 || altered > 0 || exists_after,
+            "Expected CREATED/ALTERED counters or to find ledger after creation; resp={:?}",
+            resp
+        );
     }
 }
-
-

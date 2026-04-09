@@ -25,8 +25,18 @@ pub struct StockGroup {
 
 impl StockGroup {
     pub fn validate(&self) -> Result<()> {
-        if self.name.trim().is_empty() { return Err(TallyError::Validation("Stock Group name is required".into())); }
-        if let Some(v) = &self.is_addable { if v != "Yes" && v != "No" { return Err(TallyError::Validation("ISADDABLE must be 'Yes' or 'No'".into())); } }
+        if self.name.trim().is_empty() {
+            return Err(TallyError::Validation(
+                "Stock Group name is required".into(),
+            ));
+        }
+        if let Some(v) = &self.is_addable {
+            if v != "Yes" && v != "No" {
+                return Err(TallyError::Validation(
+                    "ISADDABLE must be 'Yes' or 'No'".into(),
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -34,40 +44,109 @@ impl StockGroup {
         use serde_json::{json, Value};
         let mut m = serde_json::Map::new();
         m.insert("NAME".into(), json!(self.name));
-        if let Some(v) = &self.parent { m.insert("PARENT".into(), json!(v)); }
-        if let Some(v) = &self.alias { m.insert("ALIAS".into(), json!(v)); }
-        if let Some(v) = &self.is_addable { m.insert("ISADDABLE".into(), json!(v)); }
-        if let Some(v) = &self.as_original { m.insert("ASORIGINAL".into(), json!(v)); }
+        if let Some(v) = &self.parent {
+            m.insert("PARENT".into(), json!(v));
+        }
+        if let Some(v) = &self.alias {
+            m.insert("ALIAS".into(), json!(v));
+        }
+        if let Some(v) = &self.is_addable {
+            m.insert("ISADDABLE".into(), json!(v));
+        }
+        if let Some(v) = &self.as_original {
+            m.insert("ASORIGINAL".into(), json!(v));
+        }
 
         // HSN
-        if self.hsn_applicable_from.is_some() || self.hsn_code.is_some() || self.hsn_description.is_some() || self.hsn_classification_name.is_some() || self.hsn_source_of_details.is_some() {
+        if self.hsn_applicable_from.is_some()
+            || self.hsn_code.is_some()
+            || self.hsn_description.is_some()
+            || self.hsn_classification_name.is_some()
+            || self.hsn_source_of_details.is_some()
+        {
             let mut hsn = serde_json::Map::new();
-            hsn.insert("APPLICABLEFROM".into(), json!(self.hsn_applicable_from.clone().unwrap_or_else(|| "20250401".into())));
-            if let Some(v) = &self.hsn_code { hsn.insert("HSNCODE".into(), json!(v)); }
-            if let Some(v) = &self.hsn_description { hsn.insert("HSN".into(), json!(v)); }
-            if let Some(v) = &self.hsn_source_of_details { hsn.insert("SRCOFHSNDETAILS".into(), json!(v)); }
-            if let Some(v) = &self.hsn_classification_name { hsn.insert("HSNCLASSIFICATIONNAME".into(), json!(v)); }
+            hsn.insert(
+                "APPLICABLEFROM".into(),
+                json!(self
+                    .hsn_applicable_from
+                    .clone()
+                    .unwrap_or_else(|| "20250401".into())),
+            );
+            if let Some(v) = &self.hsn_code {
+                hsn.insert("HSNCODE".into(), json!(v));
+            }
+            if let Some(v) = &self.hsn_description {
+                hsn.insert("HSN".into(), json!(v));
+            }
+            if let Some(v) = &self.hsn_source_of_details {
+                hsn.insert("SRCOFHSNDETAILS".into(), json!(v));
+            }
+            if let Some(v) = &self.hsn_classification_name {
+                hsn.insert("HSNCLASSIFICATIONNAME".into(), json!(v));
+            }
             m.insert("HSNDETAILS.LIST".into(), Value::Object(hsn));
         }
 
         // GST
-        if self.gst_applicable_from.is_some() || self.gst_taxability.is_some() || self.gst_source_of_details.is_some() || self.gst_classification_name.is_some() || self.gst_state_name.is_some() || self.gst_rate_duty_head.is_some() || self.gst_rate_valuation_type.is_some() || self.gst_rate.is_some() {
+        if self.gst_applicable_from.is_some()
+            || self.gst_taxability.is_some()
+            || self.gst_source_of_details.is_some()
+            || self.gst_classification_name.is_some()
+            || self.gst_state_name.is_some()
+            || self.gst_rate_duty_head.is_some()
+            || self.gst_rate_valuation_type.is_some()
+            || self.gst_rate.is_some()
+        {
             let mut gst = serde_json::Map::new();
-            gst.insert("APPLICABLEFROM".into(), json!(self.gst_applicable_from.clone().unwrap_or_else(|| "20250401".into())));
-            if let Some(v) = &self.gst_taxability { gst.insert("TAXABILITY".into(), json!(v)); }
-            if let Some(v) = &self.gst_source_of_details { gst.insert("SRCOFGSTDETAILS".into(), json!(v)); }
-            if let Some(v) = &self.gst_classification_name { gst.insert("HSNMASTERNAME".into(), json!(v)); }
-            if self.gst_state_name.is_some() || self.gst_rate_duty_head.is_some() || self.gst_rate_valuation_type.is_some() || self.gst_rate.is_some() {
+            gst.insert(
+                "APPLICABLEFROM".into(),
+                json!(self
+                    .gst_applicable_from
+                    .clone()
+                    .unwrap_or_else(|| "20250401".into())),
+            );
+            if let Some(v) = &self.gst_taxability {
+                gst.insert("TAXABILITY".into(), json!(v));
+            }
+            if let Some(v) = &self.gst_source_of_details {
+                gst.insert("SRCOFGSTDETAILS".into(), json!(v));
+            }
+            if let Some(v) = &self.gst_classification_name {
+                gst.insert("HSNMASTERNAME".into(), json!(v));
+            }
+            if self.gst_state_name.is_some()
+                || self.gst_rate_duty_head.is_some()
+                || self.gst_rate_valuation_type.is_some()
+                || self.gst_rate.is_some()
+            {
                 let mut state = serde_json::Map::new();
-                state.insert("STATENAME".into(), json!(self.gst_state_name.clone().unwrap_or_else(|| "&#4; Any".into())));
-                if self.gst_rate_duty_head.is_some() || self.gst_rate_valuation_type.is_some() || self.gst_rate.is_some() {
+                state.insert(
+                    "STATENAME".into(),
+                    json!(self
+                        .gst_state_name
+                        .clone()
+                        .unwrap_or_else(|| "&#4; Any".into())),
+                );
+                if self.gst_rate_duty_head.is_some()
+                    || self.gst_rate_valuation_type.is_some()
+                    || self.gst_rate.is_some()
+                {
                     let mut rate = serde_json::Map::new();
-                    if let Some(v) = &self.gst_rate_duty_head { rate.insert("GSTRATEDUTYHEAD".into(), json!(v)); }
-                    if let Some(v) = &self.gst_rate_valuation_type { rate.insert("GSTRATEVALUATIONTYPE".into(), json!(v)); }
-                    if let Some(v) = self.gst_rate { rate.insert("GSTRATE".into(), json!(v.to_string())); }
+                    if let Some(v) = &self.gst_rate_duty_head {
+                        rate.insert("GSTRATEDUTYHEAD".into(), json!(v));
+                    }
+                    if let Some(v) = &self.gst_rate_valuation_type {
+                        rate.insert("GSTRATEVALUATIONTYPE".into(), json!(v));
+                    }
+                    if let Some(v) = self.gst_rate {
+                        rate.insert("GSTRATE".into(), json!(v.to_string()));
+                    }
                     state.insert("RATEDETAILS.LIST".into(), serde_json::Value::Object(rate));
                 }
-                gst.insert("STATEWISEDETAILS.LIST".into(), serde_json::Value::Object(state));
+                gst.insert(
+                    "STATEWISEDETAILS.LIST".into(),
+                    serde_json::Value::Object(state),
+                );
             }
             m.insert("GSTDETAILS.LIST".into(), serde_json::Value::Object(gst));
         }

@@ -5,9 +5,13 @@ use tally_sdk_rust::TallyClient;
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
         host: std::env::var("TALLY_HOST").unwrap_or_else(|_| "localhost".into()),
-        port: std::env::var("TALLY_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(9000),
+        port: std::env::var("TALLY_PORT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(9000),
         timeout_secs: 30,
         retry_attempts: 2,
+        current_company: std::env::var("TALLY_COMPANY").ok(),
         tally_net_account: None,
         tally_net_password: None,
     };
@@ -54,6 +58,14 @@ fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
 fn create_stock_item_and_verify() {
     let client = make_client();
     client.test_connection().expect("connection");
+    if client
+        .active_company_name()
+        .expect("active company lookup")
+        .is_none()
+    {
+        eprintln!("Skipping stock item creation test: no active Tally company loaded and TALLY_COMPANY is not set");
+        return;
+    }
 
     let item = build_stock_item();
 
@@ -62,7 +74,9 @@ fn create_stock_item_and_verify() {
     let existed_before = before.iter().any(|(n, _)| n == &item.name);
 
     // Create with debug to print XML when needed
-    let resp = client.create_stock_item_debug(&item).expect("create stock item");
+    let resp = client
+        .create_stock_item_debug(&item)
+        .expect("create stock item");
     if let Some(line_errors) = resp.get("LINEERROR") {
         eprintln!("LINEERROR: {:?}", line_errors);
     }
@@ -82,11 +96,17 @@ fn create_stock_item_and_verify() {
     }
 
     if !existed_before {
-        assert_eq!(exceptions, 0, "Tally returned exceptions for stock item creation: {:?}", resp);
-        assert!(created > 0 || altered > 0 || exists_after, "Expected CREATED/ALTERED or to find stock item after creation; resp={:?}", resp);
+        assert_eq!(
+            exceptions, 0,
+            "Tally returned exceptions for stock item creation: {:?}",
+            resp
+        );
+        assert!(
+            created > 0 || altered > 0 || exists_after,
+            "Expected CREATED/ALTERED or to find stock item after creation; resp={:?}",
+            resp
+        );
     } else {
         assert!(exists_after, "Stock item should exist after creation call");
     }
 }
-
-

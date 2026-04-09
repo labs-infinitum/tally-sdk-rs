@@ -1,8 +1,8 @@
-pub mod errors;
-pub mod config;
-pub mod xml_builder;
-pub mod models;
 pub mod client;
+pub mod config;
+pub mod errors;
+pub mod models;
+pub mod xml_builder;
 
 pub use crate::client::TallyClient;
 pub use crate::errors::*;

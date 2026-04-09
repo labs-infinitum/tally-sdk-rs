@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct GstRateDetail {
-    pub duty_head: String,  // CGST, SGST/UTGST, IGST, Cess, State Cess
+    pub duty_head: String, // CGST, SGST/UTGST, IGST, Cess, State Cess
     pub rate: f32,
     pub valuation_type: Option<String>,
 }
@@ -37,9 +37,19 @@ impl VoucherEntry {
         use serde_json::json;
         let mut m = serde_json::Map::new();
         m.insert("LEDGERNAME".into(), json!(self.ledger_name.clone()));
-        m.insert("ISDEEMEDPOSITIVE".into(), json!(if self.is_debit { "No" } else { "Yes" }));
-        m.insert("ISPARTYLEDGER".into(), json!(if self.is_party_ledger { "Yes" } else { "No" }));
-        let amt = if self.is_debit { self.amount } else { -self.amount.abs() };
+        m.insert(
+            "ISDEEMEDPOSITIVE".into(),
+            json!(if self.is_debit { "No" } else { "Yes" }),
+        );
+        m.insert(
+            "ISPARTYLEDGER".into(),
+            json!(if self.is_party_ledger { "Yes" } else { "No" }),
+        );
+        let amt = if self.is_debit {
+            self.amount
+        } else {
+            -self.amount.abs()
+        };
         m.insert("AMOUNT".into(), json!(amt));
         m
     }
@@ -70,6 +80,7 @@ pub struct Voucher {
     pub voucher_type: String,
     pub action: Option<String>,
     pub date_yyyymmdd: String,
+    pub amount: Option<f32>,
     pub voucher_number: Option<String>,
     pub reference: Option<String>,
     pub party_ledger_name: Option<String>,
@@ -92,11 +103,29 @@ pub struct Voucher {
 
 impl Voucher {
     pub fn validate(&self) -> Result<()> {
-        if self.voucher_type.trim().is_empty() { return Err(TallyError::Validation("Voucher type is required".into())); }
-        if self.entries.len() < 2 { return Err(TallyError::Validation("Voucher must have at least 2 entries".into())); }
-        let mut deb = 0.0; let mut cred = 0.0;
-        for e in &self.entries { if e.is_debit { deb += e.amount; } else { cred += e.amount; } }
-        if (deb - cred).abs() > 0.01 { return Err(TallyError::Validation(format!("Voucher not balanced. Debits: {}, Credits: {}", deb, cred))); }
+        if self.voucher_type.trim().is_empty() {
+            return Err(TallyError::Validation("Voucher type is required".into()));
+        }
+        if self.entries.len() < 2 {
+            return Err(TallyError::Validation(
+                "Voucher must have at least 2 entries".into(),
+            ));
+        }
+        let mut deb = 0.0;
+        let mut cred = 0.0;
+        for e in &self.entries {
+            if e.is_debit {
+                deb += e.amount;
+            } else {
+                cred += e.amount;
+            }
+        }
+        if (deb - cred).abs() > 0.01 {
+            return Err(TallyError::Validation(format!(
+                "Voucher not balanced. Debits: {}, Credits: {}",
+                deb, cred
+            )));
+        }
         Ok(())
     }
 
@@ -105,11 +134,23 @@ impl Voucher {
         let mut m = serde_json::Map::new();
         m.insert("VOUCHERTYPENAME".into(), json!(self.voucher_type.clone()));
         m.insert("DATE".into(), json!(self.date_yyyymmdd.clone()));
-        if let Some(n) = &self.narration { m.insert("NARRATION".into(), json!(n)); }
-        if let Some(vn) = &self.voucher_number { m.insert("VOUCHERNUMBER".into(), json!(vn)); }
-        if let Some(r) = &self.reference { m.insert("REFERENCE".into(), json!(r)); }
-        if let Some(p) = &self.party_ledger_name { m.insert("PARTYLEDGERNAME".into(), json!(p)); }
-        let arr: Vec<Value> = self.entries.iter().map(|e| Value::Object(e.to_map())).collect();
+        if let Some(n) = &self.narration {
+            m.insert("NARRATION".into(), json!(n));
+        }
+        if let Some(vn) = &self.voucher_number {
+            m.insert("VOUCHERNUMBER".into(), json!(vn));
+        }
+        if let Some(r) = &self.reference {
+            m.insert("REFERENCE".into(), json!(r));
+        }
+        if let Some(p) = &self.party_ledger_name {
+            m.insert("PARTYLEDGERNAME".into(), json!(p));
+        }
+        let arr: Vec<Value> = self
+            .entries
+            .iter()
+            .map(|e| Value::Object(e.to_map()))
+            .collect();
         m.insert("LEDGERENTRIES.LIST".into(), Value::Array(arr));
         m
     }
@@ -128,7 +169,11 @@ impl fmt::Display for GstRateDetail {
 
 impl fmt::Display for BatchAllocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} @ {}: {}", self.batch_name, self.godown_name, self.amount)
+        write!(
+            f,
+            "{} @ {}: {}",
+            self.batch_name, self.godown_name, self.amount
+        )
     }
 }
 
@@ -156,7 +201,7 @@ impl fmt::Display for Item {
             write!(f, " (HSN: {})", hsn)?;
         }
         writeln!(f)?;
-        
+
         if let Some(qty) = self.actual_qty {
             write!(f, "    Qty: {}", qty)?;
             if let Some(rate) = self.rate {
@@ -164,23 +209,27 @@ impl fmt::Display for Item {
             }
             writeln!(f)?;
         }
-        
+
         if !self.batch_allocations.is_empty() {
             writeln!(f, "    Batches:")?;
             for batch in &self.batch_allocations {
                 writeln!(f, "      - {}", batch)?;
             }
         }
-        
+
         if !self.accounting_allocations.is_empty() {
             writeln!(f, "    Ledgers:")?;
             for acct in &self.accounting_allocations {
                 writeln!(f, "      - {}", acct)?;
             }
         }
-        
+
         if !self.gst_rate_details.is_empty() {
-            let non_zero: Vec<_> = self.gst_rate_details.iter().filter(|r| r.rate > 0.0).collect();
+            let non_zero: Vec<_> = self
+                .gst_rate_details
+                .iter()
+                .filter(|r| r.rate > 0.0)
+                .collect();
             if !non_zero.is_empty() {
                 writeln!(f, "    GST Rates:")?;
                 for rate in non_zero {
@@ -188,7 +237,7 @@ impl fmt::Display for Item {
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -205,7 +254,10 @@ impl fmt::Display for Voucher {
             writeln!(f, "Action: {}", act)?;
         }
         writeln!(f, "Date: {}", self.date_yyyymmdd)?;
-        
+        if let Some(amount) = self.amount {
+            writeln!(f, "Amount: {}", amount)?;
+        }
+
         if let Some(vn) = &self.voucher_number {
             writeln!(f, "Number: {}", vn)?;
         }
@@ -221,25 +273,25 @@ impl fmt::Display for Voucher {
         if let Some(em) = &self.entry_mode {
             writeln!(f, "Entry Mode: {}", em)?;
         }
-        
+
         if self.is_cancelled {
             writeln!(f, "Status: CANCELLED")?;
         }
-        
+
         if !self.items.is_empty() {
             writeln!(f, "\nItems ({}):", self.items.len())?;
             for item in &self.items {
                 write!(f, "  - {}", item)?;
             }
         }
-        
+
         if !self.entries.is_empty() {
             writeln!(f, "\nLedger Entries ({}):", self.entries.len())?;
             for entry in &self.entries {
                 writeln!(f, "  - {}", entry)?;
             }
         }
-        
+
         Ok(())
     }
 }

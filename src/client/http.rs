@@ -1,8 +1,13 @@
-use crate::errors::{Result, TallyError};
 use super::TallyClient;
+use crate::errors::{Result, TallyError};
 
 impl TallyClient {
     pub fn post_xml(&self, xml: &str) -> Result<String> {
+        let prepared = self.prepare_request_xml(xml)?;
+        self.post_raw_xml(&prepared)
+    }
+
+    pub(crate) fn post_raw_xml(&self, xml: &str) -> Result<String> {
         let mut last_err: Option<TallyError> = None;
         for _ in 0..self.cfg.retry_attempts {
             match self.http.post(&self.base_url).body(xml.to_string()).send() {
@@ -10,8 +15,15 @@ impl TallyClient {
                     let status = resp.status();
                     match resp.text() {
                         Ok(text) => {
-                            if status.is_success() { return Ok(text); }
-                            else { return Err(TallyError::Http(format!("HTTP {}: {}", status.as_u16(), text))); }
+                            if status.is_success() {
+                                return Ok(text);
+                            } else {
+                                return Err(TallyError::Http(format!(
+                                    "HTTP {}: {}",
+                                    status.as_u16(),
+                                    text
+                                )));
+                            }
                         }
                         Err(e) => return Err(TallyError::Http(e.to_string())),
                     }

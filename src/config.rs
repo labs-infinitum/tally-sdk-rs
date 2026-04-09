@@ -4,6 +4,7 @@ pub struct TallyConfig {
     pub port: u16,
     pub timeout_secs: u64,
     pub retry_attempts: u32,
+    pub current_company: Option<String>,
     pub tally_net_account: Option<String>,
     pub tally_net_password: Option<String>,
 }
@@ -15,6 +16,7 @@ impl Default for TallyConfig {
             port: 9000,
             timeout_secs: 30,
             retry_attempts: 3,
+            current_company: None,
             tally_net_account: None,
             tally_net_password: None,
         }

@@ -1,14 +1,16 @@
+use crate::models::{
+    AccountingAllocation, BatchAllocation, GstRateDetail, Item, Voucher, VoucherEntry,
+};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
-use crate::models::{Voucher, VoucherEntry, Item, GstRateDetail, BatchAllocation, AccountingAllocation};
 
 pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut reader = Reader::from_reader(xml.as_bytes());
     reader.trim_text(true);
 
     let mut path: Vec<BytesStart> = vec![];
-    
+
     // Voucher level fields
     let mut voucher_guid: Option<String> = None;
     let mut voucher_remote_id: Option<String> = None;
@@ -16,6 +18,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut voucher_action: Option<String> = None;
     let mut voucher_date: Option<String> = None;
     let mut voucher_type: Option<String> = None;
+    let mut voucher_amount: Option<f32> = None;
     let mut voucher_number: Option<String> = None;
     let mut reference: Option<String> = None;
     let mut reference_date: Option<String> = None;
@@ -32,7 +35,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut entry_mode: Option<String> = None;
     let mut alter_id: Option<i32> = None;
     let mut master_id: Option<i32> = None;
-    
+
     // Item level fields
     let mut item_name: Option<String> = None;
     let mut item_amount: Option<f32> = None;
@@ -44,29 +47,29 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut item_gst_hsn_description: Option<String> = None;
     let mut item_gst_taxability: Option<String> = None;
     let mut item_gst_type_of_supply: Option<String> = None;
-    
+
     // Batch allocation fields
     let mut batch_godown: Option<String> = None;
     let mut batch_name: Option<String> = None;
     let mut batch_amount: Option<f32> = None;
     let mut batch_actual_qty: Option<f32> = None;
     let mut batch_billed_qty: Option<f32> = None;
-    
+
     // Accounting allocation fields
     let mut acct_ledger_name: Option<String> = None;
     let mut acct_amount: Option<f32> = None;
     let mut acct_is_deemed_positive: Option<String> = None;
-    
+
     // GST Rate detail fields
     let mut gst_rate_duty_head: Option<String> = None;
     let mut gst_rate: Option<f32> = None;
     let mut gst_rate_valuation_type: Option<String> = None;
-    
+
     // Ledger entry fields
     let mut ledger_entry_name: Option<String> = None;
     let mut ledger_entry_amount: Option<f32> = None;
     let mut ledger_entry_is_party: Option<String> = None;
-    
+
     // Collections
     let mut vouchers: Vec<Voucher> = vec![];
     let mut items: Vec<Item> = vec![];
@@ -90,6 +93,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         voucher_action = None;
                         voucher_date = None;
                         voucher_type = None;
+                        voucher_amount = None;
                         voucher_number = None;
                         reference = None;
                         reference_date = None;
@@ -106,7 +110,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         entry_mode = None;
                         alter_id = None;
                         master_id = None;
-                        
+
                         // Parse VOUCHER attributes
                         for attr in e.attributes().flatten() {
                             let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
@@ -157,6 +161,11 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         ledger_entry_amount = None;
                         ledger_entry_is_party = None;
                     }
+                    QName(b"ALLLEDGERENTRIES.LIST") => {
+                        ledger_entry_name = None;
+                        ledger_entry_amount = None;
+                        ledger_entry_is_party = None;
+                    }
                     _ => {}
                 }
             }
@@ -171,6 +180,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             voucher_type: voucher_type.clone().unwrap_or_default(),
                             action: voucher_action.clone(),
                             date_yyyymmdd: voucher_date.clone().unwrap_or_default(),
+                            amount: voucher_amount,
                             voucher_number: voucher_number.clone(),
                             reference: reference.clone(),
                             party_ledger_name: party_ledger_name.clone(),
@@ -191,7 +201,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             master_id,
                         });
                     }
-                    
+
                     QName(b"ALLINVENTORYENTRIES.LIST") => {
                         if let Some(name) = item_name.clone() {
                             items.push(Item {
@@ -211,10 +221,11 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             });
                         }
                     }
-                    
+
                     QName(b"BATCHALLOCATIONS.LIST") => {
-                        if let (Some(godown), Some(batch), Some(amount)) = 
-                            (batch_godown.clone(), batch_name.clone(), batch_amount) {
+                        if let (Some(godown), Some(batch), Some(amount)) =
+                            (batch_godown.clone(), batch_name.clone(), batch_amount)
+                        {
                             batch_allocations.push(BatchAllocation {
                                 godown_name: godown,
                                 batch_name: batch,
@@ -224,19 +235,25 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             });
                         }
                     }
-                    
+
                     QName(b"ACCOUNTINGALLOCATIONS.LIST") => {
-                        if let (Some(ledger), Some(amount)) = (acct_ledger_name.clone(), acct_amount) {
+                        if let (Some(ledger), Some(amount)) =
+                            (acct_ledger_name.clone(), acct_amount)
+                        {
                             accounting_allocations.push(AccountingAllocation {
                                 ledger_name: ledger,
                                 amount,
-                                is_deemed_positive: acct_is_deemed_positive.as_ref().map_or(false, |v| v == "Yes"),
+                                is_deemed_positive: acct_is_deemed_positive
+                                    .as_ref()
+                                    .map_or(false, |v| v == "Yes"),
                             });
                         }
                     }
-                    
+
                     QName(b"RATEDETAILS.LIST") => {
-                        if let (Some(duty_head), Some(rate)) = (gst_rate_duty_head.clone(), gst_rate) {
+                        if let (Some(duty_head), Some(rate)) =
+                            (gst_rate_duty_head.clone(), gst_rate)
+                        {
                             gst_rate_details.push(GstRateDetail {
                                 duty_head,
                                 rate,
@@ -244,14 +261,32 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             });
                         }
                     }
-                    
+
                     QName(b"LEDGERENTRIES.LIST") => {
-                        if let (Some(name), Some(amount)) = (ledger_entry_name.clone(), ledger_entry_amount) {
+                        if let (Some(name), Some(amount)) =
+                            (ledger_entry_name.clone(), ledger_entry_amount)
+                        {
                             voucher_entries.push(VoucherEntry {
                                 ledger_name: name,
                                 amount: amount.abs(),
                                 is_debit: amount > 0.0,
-                                is_party_ledger: ledger_entry_is_party.as_ref().map_or(false, |v| v == "Yes"),
+                                is_party_ledger: ledger_entry_is_party
+                                    .as_ref()
+                                    .map_or(false, |v| v == "Yes"),
+                            });
+                        }
+                    }
+                    QName(b"ALLLEDGERENTRIES.LIST") => {
+                        if let (Some(name), Some(amount)) =
+                            (ledger_entry_name.clone(), ledger_entry_amount)
+                        {
+                            voucher_entries.push(VoucherEntry {
+                                ledger_name: name,
+                                amount: amount.abs(),
+                                is_debit: amount > 0.0,
+                                is_party_ledger: ledger_entry_is_party
+                                    .as_ref()
+                                    .map_or(false, |v| v == "Yes"),
                             });
                         }
                     }
@@ -263,19 +298,32 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
             Ok(Event::Text(ref e)) => {
                 if let Some(last) = path.last() {
                     let text = e.unescape().unwrap().to_string();
-                    
+
                     // Helper to check if we're in a specific parent context
                     let in_context = |parent_tag: &[u8]| -> bool {
                         path.iter().any(|p| p.name() == QName(parent_tag))
                     };
-                    
+                    let in_ledger_entries = || {
+                        in_context(b"LEDGERENTRIES.LIST") || in_context(b"ALLLEDGERENTRIES.LIST")
+                    };
+
                     match last.name() {
                         // Voucher level fields
                         QName(b"GUID") if !in_context(b"ALLINVENTORYENTRIES.LIST") => {
                             voucher_guid = Some(text);
                         }
-                        QName(b"DATE") if !in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"LEDGERENTRIES.LIST") => {
+                        QName(b"DATE")
+                            if !in_context(b"ALLINVENTORYENTRIES.LIST") && !in_ledger_entries() =>
+                        {
                             voucher_date = Some(text);
+                        }
+                        QName(b"AMOUNT")
+                            if !in_context(b"ALLINVENTORYENTRIES.LIST")
+                                && !in_context(b"BATCHALLOCATIONS.LIST")
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST")
+                                && !in_ledger_entries() =>
+                        {
+                            voucher_amount = parse_tally_amount(&text);
                         }
                         QName(b"VOUCHERTYPENAME") => {
                             voucher_type = Some(text);
@@ -292,7 +340,9 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         QName(b"EFFECTIVEDATE") => {
                             effective_date = Some(text);
                         }
-                        QName(b"NARRATION") if !in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"LEDGERENTRIES.LIST") => {
+                        QName(b"NARRATION")
+                            if !in_context(b"ALLINVENTORYENTRIES.LIST") && !in_ledger_entries() =>
+                        {
                             narration = Some(text);
                         }
                         QName(b"PARTYLEDGERNAME") => {
@@ -328,24 +378,37 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         QName(b"MASTERID") => {
                             master_id = text.trim().parse().ok();
                         }
-                        
+
                         // Item level fields
                         QName(b"STOCKITEMNAME") if in_context(b"ALLINVENTORYENTRIES.LIST") => {
                             item_name = Some(text);
                         }
-                        QName(b"AMOUNT") if in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"BATCHALLOCATIONS.LIST") && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
-                            item_amount = text.parse().ok();
+                        QName(b"AMOUNT")
+                            if in_context(b"ALLINVENTORYENTRIES.LIST")
+                                && !in_context(b"BATCHALLOCATIONS.LIST")
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
+                        {
+                            item_amount = parse_tally_amount(&text);
                         }
-                        QName(b"RATE") if in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"RATEDETAILS.LIST") => {
+                        QName(b"RATE")
+                            if in_context(b"ALLINVENTORYENTRIES.LIST")
+                                && !in_context(b"RATEDETAILS.LIST") =>
+                        {
                             item_rate = text.parse().ok();
                         }
                         QName(b"DISCOUNT") if in_context(b"ALLINVENTORYENTRIES.LIST") => {
                             item_discount = text.parse().ok();
                         }
-                        QName(b"ACTUALQTY") if in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"BATCHALLOCATIONS.LIST") => {
+                        QName(b"ACTUALQTY")
+                            if in_context(b"ALLINVENTORYENTRIES.LIST")
+                                && !in_context(b"BATCHALLOCATIONS.LIST") =>
+                        {
                             item_actual_qty = text.parse().ok();
                         }
-                        QName(b"BILLEDQTY") if in_context(b"ALLINVENTORYENTRIES.LIST") && !in_context(b"BATCHALLOCATIONS.LIST") => {
+                        QName(b"BILLEDQTY")
+                            if in_context(b"ALLINVENTORYENTRIES.LIST")
+                                && !in_context(b"BATCHALLOCATIONS.LIST") =>
+                        {
                             item_billed_qty = text.parse().ok();
                         }
                         QName(b"GSTHSNNAME") => {
@@ -360,7 +423,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         QName(b"GSTOVRDNTYPEOFSUPPLY") => {
                             item_gst_type_of_supply = Some(text);
                         }
-                        
+
                         // Batch allocation fields
                         QName(b"GODOWNNAME") if in_context(b"BATCHALLOCATIONS.LIST") => {
                             batch_godown = Some(text);
@@ -369,7 +432,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             batch_name = Some(text);
                         }
                         QName(b"AMOUNT") if in_context(b"BATCHALLOCATIONS.LIST") => {
-                            batch_amount = text.parse().ok();
+                            batch_amount = parse_tally_amount(&text);
                         }
                         QName(b"ACTUALQTY") if in_context(b"BATCHALLOCATIONS.LIST") => {
                             batch_actual_qty = text.parse().ok();
@@ -377,18 +440,18 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         QName(b"BILLEDQTY") if in_context(b"BATCHALLOCATIONS.LIST") => {
                             batch_billed_qty = text.parse().ok();
                         }
-                        
+
                         // Accounting allocation fields
                         QName(b"LEDGERNAME") if in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
                             acct_ledger_name = Some(text);
                         }
                         QName(b"AMOUNT") if in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
-                            acct_amount = text.parse().ok();
+                            acct_amount = parse_tally_amount(&text);
                         }
                         QName(b"ISDEEMEDPOSITIVE") if in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
                             acct_is_deemed_positive = Some(text);
                         }
-                        
+
                         // GST Rate details
                         QName(b"GSTRATEDUTYHEAD") if in_context(b"RATEDETAILS.LIST") => {
                             gst_rate_duty_head = Some(text);
@@ -399,18 +462,24 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         QName(b"GSTRATEVALUATIONTYPE") => {
                             gst_rate_valuation_type = Some(text);
                         }
-                        
+
                         // Ledger entry fields
-                        QName(b"LEDGERNAME") if in_context(b"LEDGERENTRIES.LIST") && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
+                        QName(b"LEDGERNAME")
+                            if in_ledger_entries()
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
+                        {
                             ledger_entry_name = Some(text);
                         }
-                        QName(b"AMOUNT") if in_context(b"LEDGERENTRIES.LIST") && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
-                            ledger_entry_amount = text.parse().ok();
+                        QName(b"AMOUNT")
+                            if in_ledger_entries()
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
+                        {
+                            ledger_entry_amount = parse_tally_amount(&text);
                         }
-                        QName(b"ISPARTYLEDGER") if in_context(b"LEDGERENTRIES.LIST") => {
+                        QName(b"ISPARTYLEDGER") if in_ledger_entries() => {
                             ledger_entry_is_party = Some(text);
                         }
-                        
+
                         _ => {}
                     }
                 }
@@ -418,7 +487,11 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
 
             Ok(Event::Eof) => break,
             Err(e) => {
-                eprintln!("Error parsing XML at position {}: {:?}", reader.buffer_position(), e);
+                eprintln!(
+                    "Error parsing XML at position {}: {:?}",
+                    reader.buffer_position(),
+                    e
+                );
                 break;
             }
             _ => {}
@@ -428,3 +501,80 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     vouchers
 }
 
+fn parse_tally_amount(text: &str) -> Option<f32> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Ok(value) = trimmed.parse::<f32>() {
+        return Some(value);
+    }
+
+    let segment = trimmed.rsplit('=').next().unwrap_or(trimmed).trim();
+    let negative = segment.contains('-') || (!trimmed.contains('=') && trimmed.starts_with('-'));
+    let numeric: String = segment
+        .chars()
+        .filter(|ch| ch.is_ascii_digit() || *ch == '.')
+        .collect();
+
+    if numeric.is_empty() {
+        return None;
+    }
+
+    let value = numeric.parse::<f32>().ok()?;
+    Some(if negative { -value } else { value })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_tally_amount, parse_vouchers_from_xml};
+
+    #[test]
+    fn parses_voucher_amount_and_allledgerentries() {
+        let xml = r#"
+<ENVELOPE>
+  <BODY>
+    <DATA>
+      <COLLECTION>
+        <VOUCHER>
+          <GUID>abc</GUID>
+          <DATE>20250401</DATE>
+          <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>
+          <VOUCHERNUMBER>1</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>ICICI 2325</PARTYLEDGERNAME>
+          <AMOUNT>-250000.00</AMOUNT>
+          <ALLLEDGERENTRIES.LIST>
+            <LEDGERNAME>ICICI 2325</LEDGERNAME>
+            <ISPARTYLEDGER>Yes</ISPARTYLEDGER>
+            <AMOUNT>-250000.00</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+          <ALLLEDGERENTRIES.LIST>
+            <LEDGERNAME>Bank Charges</LEDGERNAME>
+            <ISPARTYLEDGER>No</ISPARTYLEDGER>
+            <AMOUNT>250000.00</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+        </VOUCHER>
+      </COLLECTION>
+    </DATA>
+  </BODY>
+</ENVELOPE>
+"#;
+
+        let vouchers = parse_vouchers_from_xml(xml);
+        assert_eq!(vouchers.len(), 1);
+
+        let voucher = &vouchers[0];
+        assert_eq!(voucher.amount, Some(-250000.0));
+        assert_eq!(voucher.entries.len(), 2);
+        assert_eq!(voucher.entries[0].ledger_name, "ICICI 2325");
+        assert!(voucher.entries[0].is_party_ledger);
+        assert_eq!(voucher.entries[0].amount, 250000.0);
+    }
+
+    #[test]
+    fn parses_multicurrency_amount_using_base_amount() {
+        let amount = parse_tally_amount("-$5000.00 @ ? 84.8565/$ = -? 424282.50");
+        assert_eq!(amount, Some(-424282.5));
+    }
+}

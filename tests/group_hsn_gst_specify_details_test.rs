@@ -5,9 +5,13 @@ use tally_sdk_rust::TallyClient;
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
         host: std::env::var("TALLY_HOST").unwrap_or_else(|_| "localhost".into()),
-        port: std::env::var("TALLY_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(9000),
+        port: std::env::var("TALLY_PORT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(9000),
         timeout_secs: 30,
         retry_attempts: 2,
+        current_company: std::env::var("TALLY_COMPANY").ok(),
         tally_net_account: None,
         tally_net_password: None,
     };
@@ -18,10 +22,7 @@ fn build_group() -> Group {
     let ts = chrono::Utc::now().timestamp();
     Group {
         name: format!("TP Group HSN GST Test {}", ts),
-        alias: Some(vec![
-            format!("TP-GST-HSN-{}", ts),
-            format!("TPGHG-{}", ts),
-        ]),
+        alias: Some(vec![format!("TP-GST-HSN-{}", ts), format!("TPGHG-{}", ts)]),
         parent: None,
         group_type: Some("Expenses".into()),
         affects_gross_profit: Some("Yes".into()),
@@ -38,8 +39,6 @@ fn build_group() -> Group {
         hsn_description: Some("Mobile phones and smartphones".into()),
         hsn_applicable_from: None,
         hsn_classification_name: None,
-
-        
 
         // GST (Specify Details Here)
         gst_source_of_details: Some("Specify Details Here".into()),
@@ -64,6 +63,14 @@ fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
 fn create_group_hsn_gst_specify_details() {
     let client = make_client();
     client.test_connection().expect("connection");
+    if client
+        .active_company_name()
+        .expect("active company lookup")
+        .is_none()
+    {
+        eprintln!("Skipping group creation test: no active Tally company loaded and TALLY_COMPANY is not set");
+        return;
+    }
 
     let group = build_group();
 
@@ -89,11 +96,17 @@ fn create_group_hsn_gst_specify_details() {
     }
 
     if !existed_before {
-        assert_eq!(exceptions, 0, "Tally returned exceptions for group creation: {:?}", resp);
-        assert!(created > 0 || altered > 0 || exists_after, "Expected CREATED/ALTERED or presence after; resp={:?}", resp);
+        assert_eq!(
+            exceptions, 0,
+            "Tally returned exceptions for group creation: {:?}",
+            resp
+        );
+        assert!(
+            created > 0 || altered > 0 || exists_after,
+            "Expected CREATED/ALTERED or presence after; resp={:?}",
+            resp
+        );
     } else {
         assert!(exists_after, "Group should exist after creation call");
     }
 }
-
-
