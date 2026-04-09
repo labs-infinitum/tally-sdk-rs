@@ -1,6 +1,6 @@
 use crate::config::TallyConfig;
 use crate::errors::{Result, TallyError};
-use crate::models::{Group, Ledger, StockItem, Voucher};
+use crate::models::{BalanceSheetEntry, Group, Ledger, StockItem, TrialBalanceEntry, Voucher};
 use crate::xml_builder::XmlBuilder;
 use regex::Regex;
 use std::sync::Mutex;
@@ -8,6 +8,7 @@ use std::sync::Mutex;
 mod extract;
 mod http;
 pub mod parse;
+mod report_parser;
 pub mod voucher_parser;
 
 use crate::client::extract::{
@@ -165,6 +166,46 @@ impl TallyClient {
         Ok(rows)
     }
 
+    pub fn get_currencies(&self) -> Result<Vec<String>> {
+        let current_company = self.current_company_name()?;
+        let xml = XmlBuilder::create_currency_export_request(current_company.as_deref())?;
+        let resp = self.post_xml(&xml)?;
+
+        let currency_re = Regex::new(r#"<CURRENCY\b[^>]*\bNAME="([^"]+)""#)
+            .map_err(|e| TallyError::Unexpected(e.to_string()))?;
+
+        let mut currencies = Vec::new();
+        for caps in currency_re.captures_iter(&resp) {
+            if let Some(name) = caps.get(1).map(|m| m.as_str().trim().to_string()) {
+                if !name.is_empty() && !currencies.contains(&name) {
+                    currencies.push(name);
+                }
+            }
+        }
+
+        Ok(currencies)
+    }
+
+    pub fn get_trial_balance(
+        &self,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+        explode_flag: bool,
+    ) -> Result<Vec<TrialBalanceEntry>> {
+        let resp = self.export_builtin_report("Trial Balance", from_date, to_date, explode_flag)?;
+        Ok(report_parser::parse_trial_balance_from_xml(&resp))
+    }
+
+    pub fn get_balance_sheet(
+        &self,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+        explode_flag: bool,
+    ) -> Result<Vec<BalanceSheetEntry>> {
+        let resp = self.export_builtin_report("Balance Sheet", from_date, to_date, explode_flag)?;
+        Ok(report_parser::parse_balance_sheet_from_xml(&resp))
+    }
+
     pub fn active_company_name(&self) -> Result<Option<String>> {
         self.current_company_name()
     }
@@ -251,6 +292,24 @@ impl TallyClient {
             .map(|m| m.as_str().trim().to_string())
             .filter(|name| !name.is_empty());
         Ok(company_tag)
+    }
+
+    fn export_builtin_report(
+        &self,
+        report_name: &str,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+        explode_flag: bool,
+    ) -> Result<String> {
+        let current_company = self.current_company_name()?;
+        let xml = XmlBuilder::create_builtin_report_request(
+            report_name,
+            from_date,
+            to_date,
+            current_company.as_deref(),
+            explode_flag,
+        )?;
+        self.post_xml(&xml)
     }
 }
 

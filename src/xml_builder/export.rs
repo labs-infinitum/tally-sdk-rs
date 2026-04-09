@@ -104,9 +104,90 @@ impl XmlBuilder {
 </ENVELOPE>"
         ))
     }
+
+    pub fn create_currency_export_request(current_company: Option<&str>) -> Result<String> {
+        let mut static_variables = String::from("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>");
+        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
+            static_variables.push_str("\n<SVCURRENTCOMPANY>");
+            static_variables.push_str(&XmlBuilder::escape_simple(company.trim()));
+            static_variables.push_str("</SVCURRENTCOMPANY>");
+        }
+
+        Ok(format!(
+            "<ENVELOPE>\
+<HEADER>\
+<VERSION>1</VERSION>\
+<TALLYREQUEST>EXPORT</TALLYREQUEST>\
+<TYPE>COLLECTION</TYPE>\
+<ID>CustomCurrencyCollection</ID>\
+</HEADER>\
+<BODY>\
+<DESC>\
+<STATICVARIABLES>{static_variables}</STATICVARIABLES>\
+<TDL>\
+<TDLMESSAGE>\
+<COLLECTION NAME=\"CustomCurrencyCollection\" ISMODIFY=\"No\" ISFIXED=\"No\" ISINITIALIZE=\"No\" ISOPTION=\"No\" ISINTERNAL=\"No\">\
+<TYPE>CURRENCY</TYPE>\
+</COLLECTION>\
+</TDLMESSAGE>\
+</TDL>\
+</DESC>\
+</BODY>\
+</ENVELOPE>"
+        ))
+    }
+
+    pub fn create_builtin_report_request(
+        report_name: &str,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+        current_company: Option<&str>,
+        explode_flag: bool,
+    ) -> Result<String> {
+        let mut static_variables = String::from("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>");
+
+        if explode_flag {
+            static_variables.push_str("\n<EXPLODEFLAG>Yes</EXPLODEFLAG>");
+        }
+
+        if let Some(from) = from_date {
+            static_variables.push_str("\n<SVFROMDATE TYPE=\"Date\">");
+            static_variables.push_str(&format_tally_static_date(from)?);
+            static_variables.push_str("</SVFROMDATE>");
+        }
+
+        if let Some(to) = to_date {
+            static_variables.push_str("\n<SVTODATE TYPE=\"Date\">");
+            static_variables.push_str(&format_tally_static_date(to)?);
+            static_variables.push_str("</SVTODATE>");
+        }
+
+        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
+            static_variables.push_str("\n<SVCURRENTCOMPANY>");
+            static_variables.push_str(&XmlBuilder::escape_simple(company.trim()));
+            static_variables.push_str("</SVCURRENTCOMPANY>");
+        }
+
+        Ok(format!(
+            "<ENVELOPE>\
+<HEADER>\
+<VERSION>1</VERSION>\
+<TALLYREQUEST>Export</TALLYREQUEST>\
+<TYPE>Data</TYPE>\
+<ID>{}</ID>\
+</HEADER>\
+<BODY>\
+<DESC>\
+<STATICVARIABLES>{static_variables}</STATICVARIABLES>\
+</DESC>\
+</BODY>\
+</ENVELOPE>",
+            XmlBuilder::escape_simple(report_name)
+        ))
+    }
 }
 
-fn format_tally_static_date(date: &str) -> Result<String> {
+pub(crate) fn format_tally_static_date(date: &str) -> Result<String> {
     if date.len() == 11
         && date.as_bytes().get(2) == Some(&b'-')
         && date.as_bytes().get(6) == Some(&b'-')
@@ -167,5 +248,23 @@ mod tests {
         assert!(xml.contains("<NATIVEMETHOD>*, *.*</NATIVEMETHOD>"));
         assert!(xml.contains("<FETCH>Amount</FETCH>"));
         assert!(xml.contains("<FETCH>PartyLedgerName</FETCH>"));
+    }
+
+    #[test]
+    fn builtin_report_request_uses_dates_and_company() {
+        let xml = XmlBuilder::create_builtin_report_request(
+            "Trial Balance",
+            Some("20250401"),
+            Some("20260331"),
+            Some("Example Company"),
+            true,
+        )
+        .expect("report request");
+
+        assert!(xml.contains("<ID>Trial Balance</ID>"));
+        assert!(xml.contains("<EXPLODEFLAG>Yes</EXPLODEFLAG>"));
+        assert!(xml.contains("<SVFROMDATE TYPE=\"Date\">01-Apr-2025</SVFROMDATE>"));
+        assert!(xml.contains("<SVTODATE TYPE=\"Date\">31-Mar-2026</SVTODATE>"));
+        assert!(xml.contains("<SVCURRENTCOMPANY>Example Company</SVCURRENTCOMPANY>"));
     }
 }
