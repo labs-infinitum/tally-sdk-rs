@@ -10,7 +10,7 @@ impl XmlBuilder {
             .and_then(|s| s.as_str())
             .unwrap_or("Sales");
         let mut s = String::new();
-        s.push_str("<ENVELOPE>\n<HEADER>\n<TALLYREQUEST>Import Data</TALLYREQUEST>\n</HEADER>\n<BODY>\n<IMPORTDATA>\n<REQUESTDESC>\n<REPORTNAME>All Masters</REPORTNAME>\n</REQUESTDESC>\n<REQUESTDATA>\n<TALLYMESSAGE xmlns:UDF=\"TallyUDF\">\n");
+        XmlBuilder::append_all_masters_import_start(&mut s);
         s.push_str(&format!(
             "<VOUCHER VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\">\n",
             XmlBuilder::escape_simple(name)
@@ -73,9 +73,8 @@ impl XmlBuilder {
             }
             s.push_str("</INVOICEDELNOTES.LIST>\n");
         }
-        s.push_str(
-            "</VOUCHER>\n</TALLYMESSAGE>\n</REQUESTDATA>\n</IMPORTDATA>\n</BODY>\n</ENVELOPE>",
-        );
+        s.push_str("</VOUCHER>\n");
+        XmlBuilder::append_import_end(&mut s);
         Ok(s)
     }
 }

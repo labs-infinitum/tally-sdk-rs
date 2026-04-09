@@ -6,9 +6,14 @@ use super::XmlBuilder;
 impl XmlBuilder {
     pub fn create_ledger_request(ledger_map: &serde_json::Map<String, Value>) -> Result<String> {
         let mut s = String::new();
-        s.push_str("<ENVELOPE>\n<HEADER>\n<TALLYREQUEST>Import Data</TALLYREQUEST>\n</HEADER>\n<BODY>\n<IMPORTDATA>\n<REQUESTDESC>\n<REPORTNAME>All Masters</REPORTNAME>\n</REQUESTDESC>\n<REQUESTDATA>\n<TALLYMESSAGE xmlns:UDF=\"TallyUDF\">\n<LEDGER Action=\"Create\">\n");
+        XmlBuilder::append_all_masters_import_start(&mut s);
+        s.push_str("<LEDGER Action=\"Create\">\n");
         XmlBuilder::append_simple_if(ledger_map, "NAME", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "PARENT", &mut s);
+        XmlBuilder::append_parent_tag(
+            &mut s,
+            ledger_map.get("PARENT").and_then(|v| v.as_str()),
+            false,
+        );
         if let Some(v) = ledger_map.get("OPENINGBALANCE") {
             s.push_str(&format!(
                 "<OPENINGBALANCE>{}</OPENINGBALANCE>\n",
@@ -111,93 +116,56 @@ impl XmlBuilder {
                 XmlBuilder::escape_text(v)
             ));
         }
-        if let Some(v) = ledger_map
-            .get("TDSCATEGORYDETAILS.LIST")
-            .and_then(|v| v.as_object())
-        {
-            s.push_str("<TDSCATEGORYDETAILS.LIST>\n");
-            XmlBuilder::append_simple_if(v, "CATEGORYDATE", &mut s);
-            XmlBuilder::append_simple_if(v, "CATEGORYNAME", &mut s);
-            s.push_str("</TDSCATEGORYDETAILS.LIST>\n");
-        }
+        XmlBuilder::append_tds_category_details_block(
+            &mut s,
+            ledger_map
+                .get("TDSCATEGORYDETAILS.LIST")
+                .and_then(|v| v.as_object()),
+        );
 
         XmlBuilder::append_simple_if(ledger_map, "VATDEALERNATURE", &mut s);
         XmlBuilder::append_simple_if(ledger_map, "ROUNDINGMETHOD", &mut s);
         XmlBuilder::append_simple_if(ledger_map, "ROUNDINGLIMIT", &mut s);
 
-        if let Some(v) = ledger_map
-            .get("HSNDETAILS.LIST")
-            .and_then(|v| v.as_object())
-        {
-            s.push_str("<HSNDETAILS.LIST>\n");
-            for k in [
+        XmlBuilder::append_hsn_details_block(
+            &mut s,
+            ledger_map
+                .get("HSNDETAILS.LIST")
+                .and_then(|v| v.as_object()),
+            &[
                 "APPLICABLEFROM",
                 "SRCOFHSNDETAILS",
                 "HSNCODE",
                 "HSN",
                 "HSNCLASSIFICATIONNAME",
-            ] {
-                XmlBuilder::append_simple_if(v, k, &mut s);
-            }
-            s.push_str("</HSNDETAILS.LIST>\n");
-        }
-
-        if let Some(v) = ledger_map
-            .get("GSTDETAILS.LIST")
-            .and_then(|v| v.as_object())
-        {
-            s.push_str("<GSTDETAILS.LIST>\n");
-            for k in [
+            ],
+        );
+        XmlBuilder::append_gst_details_block(
+            &mut s,
+            ledger_map
+                .get("GSTDETAILS.LIST")
+                .and_then(|v| v.as_object()),
+            &[
                 "APPLICABLEFROM",
                 "HSNMASTERNAME",
                 "TAXABILITY",
                 "SRCOFGSTDETAILS",
-            ] {
-                XmlBuilder::append_simple_if(v, k, &mut s);
-            }
-            if let Some(state) = v.get("STATEWISEDETAILS.LIST").and_then(|x| x.as_object()) {
-                s.push_str("<STATEWISEDETAILS.LIST>\n");
-                if let Some(name) = state.get("STATENAME") {
-                    if name.is_string() && name.as_str().unwrap_or("").starts_with("&#") {
-                        if let Some(sv) = name.as_str() {
-                            s.push_str(&format!("<STATENAME>{}</STATENAME>\n", sv));
-                        }
-                    } else {
-                        s.push_str(&format!(
-                            "<STATENAME>{}</STATENAME>\n",
-                            XmlBuilder::escape_text(name)
-                        ));
-                    }
-                } else {
-                    s.push_str("<STATENAME>&#4; Any</STATENAME>\n");
-                }
-                if let Some(rate) = state.get("RATEDETAILS.LIST").and_then(|x| x.as_object()) {
-                    s.push_str("<RATEDETAILS.LIST>\n");
-                    for k in ["GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE", "GSTRATE"] {
-                        XmlBuilder::append_simple_if(rate, k, &mut s);
-                    }
-                    s.push_str("</RATEDETAILS.LIST>\n");
-                }
-                s.push_str("</STATEWISEDETAILS.LIST>\n");
-            }
-            s.push_str("</GSTDETAILS.LIST>\n");
-        }
-
-        s.push_str("<LANGUAGENAME.LIST>\n<NAME.LIST TYPE=\"String\">\n");
-        if let Some(Value::String(name)) = ledger_map.get("NAME").cloned() {
-            s.push_str(&format!("<NAME>{}</NAME>\n", name));
-        }
-        if let Some(Value::Array(alias_arr)) = ledger_map.get("ALIAS") {
-            for alias in alias_arr {
-                if let Value::String(a) = alias {
-                    s.push_str(&format!("<NAME>{}</NAME>\n", a));
-                }
-            }
-        }
-        s.push_str("</NAME.LIST>\n<LANGUAGEID>1033</LANGUAGEID>\n</LANGUAGENAME.LIST>\n");
-        s.push_str(
-            "</LEDGER>\n</TALLYMESSAGE>\n</REQUESTDATA>\n</IMPORTDATA>\n</BODY>\n</ENVELOPE>",
+            ],
+            true,
+            true,
         );
+
+        if let Some(Value::String(name)) = ledger_map.get("NAME") {
+            XmlBuilder::append_language_name_list(
+                &mut s,
+                name,
+                ledger_map.get("ALIAS"),
+                false,
+                false,
+            );
+        }
+        s.push_str("</LEDGER>\n");
+        XmlBuilder::append_import_end(&mut s);
         Ok(s)
     }
 }
