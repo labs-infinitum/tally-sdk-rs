@@ -1,6 +1,6 @@
 use tally_sdk_rust::client::{parse_simple_response, TallyClient};
 use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::{ImportResult, ItemInvoice, Ledger, StockItem};
+use tally_sdk_rust::models::{ItemInvoice, Ledger, StockItem};
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {

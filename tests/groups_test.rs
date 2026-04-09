@@ -181,7 +181,7 @@ fn create_group_under_another_group() {
     }
 
     assert!(
-        found.is_some() || child_created > 0 || child_altered > 0,
+        found.is_some() || child_resp.created > 0 || child_resp.altered > 0,
         "child group not found and child create response did not indicate success: {:?}",
         child_resp
     );

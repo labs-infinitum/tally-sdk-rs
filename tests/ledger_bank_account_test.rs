@@ -136,8 +136,8 @@ fn create_bank_account_ledger_full_details() {
 
     if !existed_before {
         // Ensure success (created/altered) or at least existence now, and no exceptions
-        assert!(
-            resp.exceptions == 0,
+        assert_eq!(
+            resp.exceptions, 0,
             "Tally returned exceptions for creation: {:?}",
             resp
         );
