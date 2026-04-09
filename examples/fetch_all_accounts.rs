@@ -10,11 +10,15 @@ fn main() {
         eprintln!("Failed to fetch accounts: {err}");
         std::process::exit(1);
     });
-    accounts.sort_by(|a, b| a.0.cmp(&b.0));
+    accounts.sort_by(|a, b| a.name.cmp(&b.name));
 
     println!("Accounts in company: {company}");
     println!("Found {} account(s)", accounts.len());
-    for (name, parent) in accounts {
-        println!("{} | parent {}", name, parent.unwrap_or_else(|| "-".into()));
+    for account in accounts {
+        println!(
+            "{} | parent {}",
+            account.name,
+            account.parent.unwrap_or_else(|| "-".into())
+        );
     }
 }

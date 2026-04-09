@@ -24,7 +24,7 @@ fn ensure_party_ledger(client: &TallyClient, name: &str) {
         .get_ledgers()
         .unwrap_or_default()
         .iter()
-        .any(|(n, _)| n == name);
+        .any(|ledger| ledger.name == name);
     if !exists {
         let ledger = Ledger {
             name: name.to_string(),
@@ -94,7 +94,7 @@ fn ensure_purchase_ledger(client: &TallyClient, name: &str) {
         .get_ledgers()
         .unwrap_or_default()
         .iter()
-        .any(|(n, _)| n == name);
+        .any(|ledger| ledger.name == name);
     if !exists {
         let ledger = Ledger {
             name: name.to_string(),
@@ -164,7 +164,7 @@ fn ensure_stock_item(client: &TallyClient, name: &str) {
         .get_stock_items()
         .unwrap_or_default()
         .iter()
-        .any(|(n, _)| n == name);
+        .any(|item| item.name == name);
     if !exists {
         let item = StockItem {
             name: name.to_string(),

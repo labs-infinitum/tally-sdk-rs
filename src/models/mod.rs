@@ -1,3 +1,4 @@
+mod collection;
 mod group;
 mod helpers;
 mod item_invoice;
@@ -8,6 +9,7 @@ mod stock_item;
 mod unit;
 mod voucher;
 
+pub use collection::{CurrencySummary, GroupSummary, LedgerSummary, StockItemSummary};
 pub use group::Group;
 pub use item_invoice::ItemInvoice;
 pub use ledger::Ledger;

@@ -79,14 +79,14 @@ fn create_and_fetch_groups() {
     let mut has_after = false;
     for _ in 0..6 {
         let after = client.get_groups().expect("fetch groups after");
-        has_after = after.iter().any(|(n, _)| n == &unique_name);
+        has_after = after.iter().any(|group| group.name == unique_name);
         if has_after {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
-    let had_before = before.iter().any(|(n, _)| n == &unique_name);
+    let had_before = before.iter().any(|group| group.name == unique_name);
 
     if !had_before {
         assert_eq!(
@@ -183,10 +183,13 @@ fn create_group_under_another_group() {
         child_resp
     );
 
-    let mut found: Option<(String, Option<String>)> = None;
+    let mut found = None;
     for _ in 0..6 {
         let groups = client.get_groups().expect("fetch groups");
-        found = groups.iter().find(|(n, _)| n == &child_name).cloned();
+        found = groups
+            .iter()
+            .find(|group| group.name == child_name)
+            .cloned();
         if found.is_some() {
             break;
         }
@@ -198,8 +201,8 @@ fn create_group_under_another_group() {
         "child group not found and child create response did not indicate success: {:?}",
         child_resp
     );
-    if let Some((_, p)) = found {
-        if let Some(pp) = p {
+    if let Some(group) = found {
+        if let Some(pp) = group.parent {
             assert_eq!(pp, parent_name, "child group's parent mismatch");
         }
     }

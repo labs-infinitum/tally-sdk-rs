@@ -10,11 +10,11 @@ fn main() {
         eprintln!("Failed to fetch currencies: {err}");
         std::process::exit(1);
     });
-    currencies.sort();
+    currencies.sort_by(|a, b| a.name.cmp(&b.name));
 
     println!("Currencies in company: {company}");
     println!("Found {} currency/currencies", currencies.len());
     for currency in currencies {
-        println!("{currency}");
+        println!("{}", currency.name);
     }
 }

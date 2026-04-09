@@ -127,7 +127,7 @@ fn create_bank_account_ledger_full_details() {
     let ledger = build_bank_account_ledger();
     // verify before
     let before = client.get_ledgers().unwrap_or_default();
-    let existed_before = before.iter().any(|(n, _)| n == &ledger.name);
+    let existed_before = before.iter().any(|entry| entry.name == ledger.name);
     let resp = client.create_ledger(&ledger).expect("create ledger");
 
     let created = get_counter(&resp, "CREATED");
@@ -138,7 +138,7 @@ fn create_bank_account_ledger_full_details() {
     let mut exists_after = false;
     for _ in 0..6 {
         let after = client.get_ledgers().unwrap_or_default();
-        if after.iter().any(|(n, _)| n == &ledger.name) {
+        if after.iter().any(|entry| entry.name == ledger.name) {
             exists_after = true;
             break;
         }

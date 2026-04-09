@@ -71,7 +71,7 @@ fn create_stock_item_and_verify() {
 
     // Before
     let before = client.get_stock_items().unwrap_or_default();
-    let existed_before = before.iter().any(|(n, _)| n == &item.name);
+    let existed_before = before.iter().any(|entry| entry.name == item.name);
 
     // Create with debug to print XML when needed
     let resp = client
@@ -88,7 +88,7 @@ fn create_stock_item_and_verify() {
     let mut exists_after = false;
     for _ in 0..6 {
         let after = client.get_stock_items().unwrap_or_default();
-        if after.iter().any(|(n, _)| n == &item.name) {
+        if after.iter().any(|entry| entry.name == item.name) {
             exists_after = true;
             break;
         }

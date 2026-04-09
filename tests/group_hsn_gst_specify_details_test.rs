@@ -76,7 +76,7 @@ fn create_group_hsn_gst_specify_details() {
 
     // Before
     let before = client.get_groups().unwrap_or_default();
-    let existed_before = before.iter().any(|(n, _)| n == &group.name);
+    let existed_before = before.iter().any(|entry| entry.name == group.name);
 
     // Create
     let resp = client.create_group_debug(&group).expect("create group");
@@ -88,7 +88,7 @@ fn create_group_hsn_gst_specify_details() {
     let mut exists_after = false;
     for _ in 0..6 {
         let after = client.get_groups().unwrap_or_default();
-        if after.iter().any(|(n, _)| n == &group.name) {
+        if after.iter().any(|entry| entry.name == group.name) {
             exists_after = true;
             break;
         }
