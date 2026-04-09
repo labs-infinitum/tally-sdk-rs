@@ -18,13 +18,6 @@ fn make_client() -> TallyClient {
     TallyClient::new(cfg).expect("client")
 }
 
-fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
-        .unwrap_or(0)
-}
-
 #[test]
 fn create_and_fetch_groups() {
     // This test hits a running TallyPrime at TALLY_HOST:TALLY_PORT
@@ -72,9 +65,6 @@ fn create_and_fetch_groups() {
     };
 
     let resp = client.create_group(&grp).expect("create group");
-    let created = get_counter(&resp, "CREATED");
-    let altered = get_counter(&resp, "ALTERED");
-    let exceptions = get_counter(&resp, "EXCEPTIONS");
 
     let mut has_after = false;
     for _ in 0..6 {
@@ -90,12 +80,12 @@ fn create_and_fetch_groups() {
 
     if !had_before {
         assert_eq!(
-            exceptions, 0,
+            resp.exceptions, 0,
             "Tally returned exceptions for group creation: {:?}",
             resp
         );
         assert!(
-            created > 0 || altered > 0 || has_after,
+            resp.created > 0 || resp.altered > 0 || has_after,
             "Created group not found in groups list after creation; resp={:?}",
             resp
         );
@@ -147,16 +137,13 @@ fn create_group_under_another_group() {
         gst_state_name: None,
     };
     let parent_resp = client.create_group(&parent).expect("create parent group");
-    let parent_created = get_counter(&parent_resp, "CREATED");
-    let parent_altered = get_counter(&parent_resp, "ALTERED");
-    let parent_exceptions = get_counter(&parent_resp, "EXCEPTIONS");
     assert_eq!(
-        parent_exceptions, 0,
+        parent_resp.exceptions, 0,
         "Parent group creation returned exceptions: {:?}",
         parent_resp
     );
     assert!(
-        parent_created > 0 || parent_altered > 0,
+        parent_resp.created > 0 || parent_resp.altered > 0,
         "Parent group was not created or altered: {:?}",
         parent_resp
     );
@@ -169,16 +156,13 @@ fn create_group_under_another_group() {
         ..parent
     };
     let child_resp = client.create_group(&child).expect("create child group");
-    let child_created = get_counter(&child_resp, "CREATED");
-    let child_altered = get_counter(&child_resp, "ALTERED");
-    let child_exceptions = get_counter(&child_resp, "EXCEPTIONS");
     assert_eq!(
-        child_exceptions, 0,
+        child_resp.exceptions, 0,
         "Child group creation returned exceptions: {:?}",
         child_resp
     );
     assert!(
-        child_created > 0 || child_altered > 0,
+        child_resp.created > 0 || child_resp.altered > 0,
         "Child group was not created or altered: {:?}",
         child_resp
     );

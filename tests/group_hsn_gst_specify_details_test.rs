@@ -52,13 +52,6 @@ fn build_group() -> Group {
     }
 }
 
-fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
-        .unwrap_or(0)
-}
-
 #[test]
 fn create_group_hsn_gst_specify_details() {
     let client = make_client();
@@ -80,9 +73,6 @@ fn create_group_hsn_gst_specify_details() {
 
     // Create
     let resp = client.create_group_debug(&group).expect("create group");
-    let created = get_counter(&resp, "CREATED");
-    let altered = get_counter(&resp, "ALTERED");
-    let exceptions = get_counter(&resp, "EXCEPTIONS");
 
     // After (with small polling for eventual consistency)
     let mut exists_after = false;
@@ -97,12 +87,12 @@ fn create_group_hsn_gst_specify_details() {
 
     if !existed_before {
         assert_eq!(
-            exceptions, 0,
+            resp.exceptions, 0,
             "Tally returned exceptions for group creation: {:?}",
             resp
         );
         assert!(
-            created > 0 || altered > 0 || exists_after,
+            resp.created > 0 || resp.altered > 0 || exists_after,
             "Expected CREATED/ALTERED or presence after; resp={:?}",
             resp
         );

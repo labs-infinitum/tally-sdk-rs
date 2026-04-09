@@ -5,167 +5,181 @@ use super::XmlBuilder;
 
 impl XmlBuilder {
     pub fn create_ledger_request(ledger_map: &serde_json::Map<String, Value>) -> Result<String> {
-        let mut s = String::new();
-        XmlBuilder::append_all_masters_import_start(&mut s);
-        s.push_str("<LEDGER Action=\"Create\">\n");
-        XmlBuilder::append_simple_if(ledger_map, "NAME", &mut s);
-        XmlBuilder::append_parent_tag(
-            &mut s,
-            ledger_map.get("PARENT").and_then(|v| v.as_str()),
-            false,
-        );
-        if let Some(v) = ledger_map.get("OPENINGBALANCE") {
-            s.push_str(&format!(
-                "<OPENINGBALANCE>{}</OPENINGBALANCE>\n",
-                XmlBuilder::escape_text(v)
-            ));
-        }
-        XmlBuilder::append_simple_if(ledger_map, "INCOMETAXNUMBER", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "GSTAPPLICABLE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "APPROPRIATEFOR", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "GSTAPPROPRIATETO", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "EXCISEALLOCTYPE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "GSTTYPEOFSUPPLY", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "GSTDUTYHEAD", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "RATEOFTAXCALCULATION", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "TAXTYPE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "BILLCREDITPERIOD", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "ISBILLWISEON", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "ISCREDITDAYSCHKON", &mut s);
+        XmlBuilder::create_all_masters_import_request(|writer| {
+            XmlBuilder::write_start_tag_with_attrs(writer, "LEDGER", &[("Action", "Create")])?;
+            XmlBuilder::write_simple_if(writer, ledger_map, "NAME")?;
+            XmlBuilder::write_parent_tag(
+                writer,
+                ledger_map.get("PARENT").and_then(|v| v.as_str()),
+                false,
+            )?;
+            if let Some(v) = ledger_map.get("OPENINGBALANCE") {
+                XmlBuilder::write_simple(writer, "OPENINGBALANCE", v)?;
+            }
+            for key in [
+                "INCOMETAXNUMBER",
+                "GSTAPPLICABLE",
+                "APPROPRIATEFOR",
+                "GSTAPPROPRIATETO",
+                "EXCISEALLOCTYPE",
+                "GSTTYPEOFSUPPLY",
+                "GSTDUTYHEAD",
+                "RATEOFTAXCALCULATION",
+                "TAXTYPE",
+                "BILLCREDITPERIOD",
+                "ISBILLWISEON",
+                "ISCREDITDAYSCHKON",
+            ] {
+                XmlBuilder::write_simple_if(writer, ledger_map, key)?;
+            }
 
-        if let Some(v) = ledger_map
-            .get("LEDMAILINGDETAILS.LIST")
-            .and_then(|v| v.as_object())
-        {
-            s.push_str("<LEDMAILINGDETAILS.LIST>\n");
-            XmlBuilder::append_simple_if(v, "APPLICABLEFROM", &mut s);
-            XmlBuilder::append_simple_if(v, "MAILINGNAME", &mut s);
-            if let Some(addr_list) = v.get("ADDRESS.LIST").and_then(|x| x.as_array()) {
-                s.push_str("<ADDRESS.LIST TYPE=\"String\">\n");
-                for item in addr_list {
-                    if let Some(obj) = item.as_object() {
-                        XmlBuilder::append_simple_if(obj, "ADDRESS", &mut s);
+            if let Some(v) = ledger_map
+                .get("LEDMAILINGDETAILS.LIST")
+                .and_then(|v| v.as_object())
+            {
+                XmlBuilder::write_start_tag(writer, "LEDMAILINGDETAILS.LIST")?;
+                for key in [
+                    "APPLICABLEFROM",
+                    "MAILINGNAME",
+                    "COUNTRY",
+                    "STATE",
+                    "PINCODE",
+                ] {
+                    if key == "COUNTRY" || key == "STATE" || key == "PINCODE" {
+                        continue;
                     }
+                    XmlBuilder::write_simple_if(writer, v, key)?;
                 }
-                s.push_str("</ADDRESS.LIST>\n");
+                if let Some(addr_list) = v.get("ADDRESS.LIST").and_then(|x| x.as_array()) {
+                    XmlBuilder::write_start_tag_with_attrs(
+                        writer,
+                        "ADDRESS.LIST",
+                        &[("TYPE", "String")],
+                    )?;
+                    for item in addr_list {
+                        if let Some(obj) = item.as_object() {
+                            XmlBuilder::write_simple_if(writer, obj, "ADDRESS")?;
+                        }
+                    }
+                    XmlBuilder::write_end_tag(writer, "ADDRESS.LIST")?;
+                }
+                for key in ["COUNTRY", "STATE", "PINCODE"] {
+                    XmlBuilder::write_simple_if(writer, v, key)?;
+                }
+                XmlBuilder::write_end_tag(writer, "LEDMAILINGDETAILS.LIST")?;
             }
-            XmlBuilder::append_simple_if(v, "COUNTRY", &mut s);
-            XmlBuilder::append_simple_if(v, "STATE", &mut s);
-            XmlBuilder::append_simple_if(v, "PINCODE", &mut s);
-            s.push_str("</LEDMAILINGDETAILS.LIST>\n");
-        }
 
-        XmlBuilder::append_simple_if(ledger_map, "BANKDETAILS", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "IFSCODE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "BANKACCHOLDERNAME", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "SWIFTCODE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "BRANCHNAME", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "BANKBSRCODE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "ODLIMIT", &mut s);
-
-        if let Some(v) = ledger_map
-            .get("LEDGSTREGDETAILS.LIST")
-            .and_then(|v| v.as_object())
-        {
-            s.push_str("<LEDGSTREGDETAILS.LIST>\n");
-            for k in [
-                "APPLICABLEFROM",
-                "GSTREGISTRATIONTYPE",
-                "GSTIN",
-                "PLACEOFSUPPLY",
-                "TRANSPORTERID",
-                "ISOTHTERRITORYASSESSEE",
-                "CONSIDERPURCHASEFOREXPORT",
-                "ISTRANSPORTER",
-                "ISCOMMONPARTY",
-            ] {
-                XmlBuilder::append_simple_if(v, k, &mut s);
-            }
-            s.push_str("</LEDGSTREGDETAILS.LIST>\n");
-        }
-
-        if let Some(v) = ledger_map.get("PAYMENTDETAILS").and_then(|v| v.as_object()) {
-            s.push_str("<PAYMENTDETAILS.LIST>\n");
-            for k in [
-                "PAYMENTFAVOURING",
-                "TRANSACTIONNAME",
-                "SETASDEFAULT",
-                "DEFAULTTRANSACTIONTYPE",
-                "CHEQUECROSSCOMMENT",
-                "VIRTUALPAYMENTADDRESS",
+            for key in [
+                "BANKDETAILS",
                 "IFSCODE",
-                "BANKNAME",
-                "ACCOUNTNUMBER",
+                "BANKACCHOLDERNAME",
+                "SWIFTCODE",
+                "BRANCHNAME",
+                "BANKBSRCODE",
+                "ODLIMIT",
             ] {
-                XmlBuilder::append_simple_if(v, k, &mut s);
+                XmlBuilder::write_simple_if(writer, ledger_map, key)?;
             }
-            if let Some(ben) = v.get("BENEFICIARYCODEDETAILS").and_then(|x| x.as_object()) {
-                s.push_str("<BENEFICIARYCODEDETAILS.LIST>\n");
-                XmlBuilder::append_simple_if(ben, "BENEFICIARYCODE", &mut s);
-                s.push_str("</BENEFICIARYCODEDETAILS.LIST>\n");
+
+            if let Some(v) = ledger_map
+                .get("LEDGSTREGDETAILS.LIST")
+                .and_then(|v| v.as_object())
+            {
+                XmlBuilder::write_start_tag(writer, "LEDGSTREGDETAILS.LIST")?;
+                for key in [
+                    "APPLICABLEFROM",
+                    "GSTREGISTRATIONTYPE",
+                    "GSTIN",
+                    "PLACEOFSUPPLY",
+                    "TRANSPORTERID",
+                    "ISOTHTERRITORYASSESSEE",
+                    "CONSIDERPURCHASEFOREXPORT",
+                    "ISTRANSPORTER",
+                    "ISCOMMONPARTY",
+                ] {
+                    XmlBuilder::write_simple_if(writer, v, key)?;
+                }
+                XmlBuilder::write_end_tag(writer, "LEDGSTREGDETAILS.LIST")?;
             }
-            s.push_str("</PAYMENTDETAILS.LIST>\n");
-        }
 
-        XmlBuilder::append_simple_if(ledger_map, "ISTDSAPPLICABLE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "TDSDEDUCTEETYPE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "DEDUCTINSAMEVCH", &mut s);
-        if let Some(v) = ledger_map.get("TDSAPPLICABLE") {
-            s.push_str(&format!(
-                "<TDSAPPLICABLE>{}</TDSAPPLICABLE>\n",
-                XmlBuilder::escape_text(v)
-            ));
-        }
-        XmlBuilder::append_tds_category_details_block(
-            &mut s,
-            ledger_map
-                .get("TDSCATEGORYDETAILS.LIST")
-                .and_then(|v| v.as_object()),
-        );
+            if let Some(v) = ledger_map.get("PAYMENTDETAILS").and_then(|v| v.as_object()) {
+                XmlBuilder::write_start_tag(writer, "PAYMENTDETAILS.LIST")?;
+                for key in [
+                    "PAYMENTFAVOURING",
+                    "TRANSACTIONNAME",
+                    "SETASDEFAULT",
+                    "DEFAULTTRANSACTIONTYPE",
+                    "CHEQUECROSSCOMMENT",
+                    "VIRTUALPAYMENTADDRESS",
+                    "IFSCODE",
+                    "BANKNAME",
+                    "ACCOUNTNUMBER",
+                ] {
+                    XmlBuilder::write_simple_if(writer, v, key)?;
+                }
+                if let Some(ben) = v.get("BENEFICIARYCODEDETAILS").and_then(|x| x.as_object()) {
+                    XmlBuilder::write_start_tag(writer, "BENEFICIARYCODEDETAILS.LIST")?;
+                    XmlBuilder::write_simple_if(writer, ben, "BENEFICIARYCODE")?;
+                    XmlBuilder::write_end_tag(writer, "BENEFICIARYCODEDETAILS.LIST")?;
+                }
+                XmlBuilder::write_end_tag(writer, "PAYMENTDETAILS.LIST")?;
+            }
 
-        XmlBuilder::append_simple_if(ledger_map, "VATDEALERNATURE", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "ROUNDINGMETHOD", &mut s);
-        XmlBuilder::append_simple_if(ledger_map, "ROUNDINGLIMIT", &mut s);
+            for key in ["ISTDSAPPLICABLE", "TDSDEDUCTEETYPE", "DEDUCTINSAMEVCH"] {
+                XmlBuilder::write_simple_if(writer, ledger_map, key)?;
+            }
+            if let Some(v) = ledger_map.get("TDSAPPLICABLE") {
+                XmlBuilder::write_simple(writer, "TDSAPPLICABLE", v)?;
+            }
+            XmlBuilder::write_tds_category_details_block(
+                writer,
+                ledger_map
+                    .get("TDSCATEGORYDETAILS.LIST")
+                    .and_then(|v| v.as_object()),
+            )?;
 
-        XmlBuilder::append_hsn_details_block(
-            &mut s,
-            ledger_map
-                .get("HSNDETAILS.LIST")
-                .and_then(|v| v.as_object()),
-            &[
-                "APPLICABLEFROM",
-                "SRCOFHSNDETAILS",
-                "HSNCODE",
-                "HSN",
-                "HSNCLASSIFICATIONNAME",
-            ],
-        );
-        XmlBuilder::append_gst_details_block(
-            &mut s,
-            ledger_map
-                .get("GSTDETAILS.LIST")
-                .and_then(|v| v.as_object()),
-            &[
-                "APPLICABLEFROM",
-                "HSNMASTERNAME",
-                "TAXABILITY",
-                "SRCOFGSTDETAILS",
-            ],
-            true,
-            true,
-        );
+            for key in ["VATDEALERNATURE", "ROUNDINGMETHOD", "ROUNDINGLIMIT"] {
+                XmlBuilder::write_simple_if(writer, ledger_map, key)?;
+            }
 
-        if let Some(Value::String(name)) = ledger_map.get("NAME") {
-            XmlBuilder::append_language_name_list(
-                &mut s,
-                name,
-                ledger_map.get("ALIAS"),
-                false,
-                false,
-            );
-        }
-        s.push_str("</LEDGER>\n");
-        XmlBuilder::append_import_end(&mut s);
-        Ok(s)
+            XmlBuilder::write_hsn_details_block(
+                writer,
+                ledger_map
+                    .get("HSNDETAILS.LIST")
+                    .and_then(|v| v.as_object()),
+                &[
+                    "APPLICABLEFROM",
+                    "SRCOFHSNDETAILS",
+                    "HSNCODE",
+                    "HSN",
+                    "HSNCLASSIFICATIONNAME",
+                ],
+            )?;
+            XmlBuilder::write_gst_details_block(
+                writer,
+                ledger_map
+                    .get("GSTDETAILS.LIST")
+                    .and_then(|v| v.as_object()),
+                &[
+                    "APPLICABLEFROM",
+                    "HSNMASTERNAME",
+                    "TAXABILITY",
+                    "SRCOFGSTDETAILS",
+                ],
+                true,
+                true,
+            )?;
+
+            if let Some(Value::String(name)) = ledger_map.get("NAME") {
+                XmlBuilder::write_language_name_list(
+                    writer,
+                    name,
+                    ledger_map.get("ALIAS"),
+                    false,
+                    false,
+                )?;
+            }
+            XmlBuilder::write_end_tag(writer, "LEDGER")
+        })
     }
 }

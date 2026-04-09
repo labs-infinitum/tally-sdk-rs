@@ -7,135 +7,168 @@ use std::io::Cursor;
 use super::XmlBuilder;
 
 impl XmlBuilder {
-    pub(crate) fn append_all_masters_import_start(s: &mut String) {
-        s.push_str(
-            "<ENVELOPE>\n<HEADER>\n<TALLYREQUEST>Import Data</TALLYREQUEST>\n</HEADER>\n<BODY>\n<IMPORTDATA>\n<REQUESTDESC>\n<REPORTNAME>All Masters</REPORTNAME>\n</REQUESTDESC>\n<REQUESTDATA>\n<TALLYMESSAGE xmlns:UDF=\"TallyUDF\">\n",
-        );
+    pub(crate) fn create_all_masters_import_request<F>(build: F) -> Result<String>
+    where
+        F: FnOnce(&mut Writer<Cursor<Vec<u8>>>) -> Result<()>,
+    {
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_start_tag(&mut writer, "ENVELOPE")?;
+        XmlBuilder::write_start_tag(&mut writer, "HEADER")?;
+        XmlBuilder::write_text_node(&mut writer, "TALLYREQUEST", "Import Data")?;
+        XmlBuilder::write_end_tag(&mut writer, "HEADER")?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "IMPORTDATA")?;
+        XmlBuilder::write_start_tag(&mut writer, "REQUESTDESC")?;
+        XmlBuilder::write_text_node(&mut writer, "REPORTNAME", "All Masters")?;
+        XmlBuilder::write_end_tag(&mut writer, "REQUESTDESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "REQUESTDATA")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "TALLYMESSAGE",
+            &[("xmlns:UDF", "TallyUDF")],
+        )?;
+
+        build(&mut writer)?;
+
+        XmlBuilder::write_end_tag(&mut writer, "TALLYMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "REQUESTDATA")?;
+        XmlBuilder::write_end_tag(&mut writer, "IMPORTDATA")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
+
+        XmlBuilder::finish_writer(writer)
     }
 
-    pub(crate) fn append_import_end(s: &mut String) {
-        s.push_str("</TALLYMESSAGE>\n</REQUESTDATA>\n</IMPORTDATA>\n</BODY>\n</ENVELOPE>");
-    }
-
-    pub(crate) fn append_parent_tag(s: &mut String, parent: Option<&str>, allow_empty: bool) {
+    pub(crate) fn write_parent_tag(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        parent: Option<&str>,
+        allow_empty: bool,
+    ) -> Result<()> {
         if let Some(parent) = parent {
-            s.push_str(&format!(
-                "<PARENT>{}</PARENT>\n",
-                XmlBuilder::escape_simple(parent)
-            ));
+            XmlBuilder::write_text_node(writer, "PARENT", parent)?;
         } else if allow_empty {
-            s.push_str("<PARENT/>\n");
+            writer
+                .write_event(Event::Empty(BytesStart::new("PARENT")))
+                .map_err(|e| TallyError::Xml(e.to_string()))?;
         }
+        Ok(())
     }
 
-    pub(crate) fn append_language_name_list(
-        s: &mut String,
+    pub(crate) fn write_language_name_list(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
         name: &str,
         aliases: Option<&Value>,
         escape_values: bool,
         spaced_language_id: bool,
-    ) {
-        s.push_str("<LANGUAGENAME.LIST>\n<NAME.LIST TYPE=\"String\">\n");
-        XmlBuilder::append_name_entry(s, name, escape_values);
+    ) -> Result<()> {
+        XmlBuilder::write_start_tag(writer, "LANGUAGENAME.LIST")?;
+        XmlBuilder::write_start_tag_with_attrs(writer, "NAME.LIST", &[("TYPE", "String")])?;
+        XmlBuilder::write_name_entry(writer, name, escape_values)?;
         if let Some(Value::Array(alias_arr)) = aliases {
             for alias in alias_arr {
                 if let Value::String(alias) = alias {
-                    XmlBuilder::append_name_entry(s, alias, escape_values);
+                    XmlBuilder::write_name_entry(writer, alias, escape_values)?;
                 }
             }
         }
         let language_id = if spaced_language_id { " 1033" } else { "1033" };
-        s.push_str(&format!(
-            "</NAME.LIST>\n<LANGUAGEID>{language_id}</LANGUAGEID>\n</LANGUAGENAME.LIST>\n"
-        ));
+        XmlBuilder::write_end_tag(writer, "NAME.LIST")?;
+        XmlBuilder::write_text_node(writer, "LANGUAGEID", language_id)?;
+        XmlBuilder::write_end_tag(writer, "LANGUAGENAME.LIST")?;
+        Ok(())
     }
 
-    pub(crate) fn append_hsn_details_block(
-        s: &mut String,
+    pub(crate) fn write_hsn_details_block(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
         obj: Option<&serde_json::Map<String, Value>>,
         keys: &[&str],
-    ) {
+    ) -> Result<()> {
         if let Some(obj) = obj {
-            s.push_str("<HSNDETAILS.LIST>\n");
+            XmlBuilder::write_start_tag(writer, "HSNDETAILS.LIST")?;
             for key in keys {
-                XmlBuilder::append_simple_if(obj, key, s);
+                XmlBuilder::write_simple_if(writer, obj, key)?;
             }
-            s.push_str("</HSNDETAILS.LIST>\n");
+            XmlBuilder::write_end_tag(writer, "HSNDETAILS.LIST")?;
         }
+        Ok(())
     }
 
-    pub(crate) fn append_gst_details_block(
-        s: &mut String,
+    pub(crate) fn write_gst_details_block(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
         obj: Option<&serde_json::Map<String, Value>>,
         keys: &[&str],
         state_fallback_any: bool,
         preserve_numeric_entity_state: bool,
-    ) {
+    ) -> Result<()> {
         if let Some(obj) = obj {
-            s.push_str("<GSTDETAILS.LIST>\n");
+            XmlBuilder::write_start_tag(writer, "GSTDETAILS.LIST")?;
             for key in keys {
-                XmlBuilder::append_simple_if(obj, key, s);
+                XmlBuilder::write_simple_if(writer, obj, key)?;
             }
             if let Some(state) = obj.get("STATEWISEDETAILS.LIST").and_then(|x| x.as_object()) {
-                XmlBuilder::append_statewise_details_block(
-                    s,
+                XmlBuilder::write_statewise_details_block(
+                    writer,
                     state,
                     state_fallback_any,
                     preserve_numeric_entity_state,
-                );
+                )?;
             }
-            s.push_str("</GSTDETAILS.LIST>\n");
+            XmlBuilder::write_end_tag(writer, "GSTDETAILS.LIST")?;
         }
+        Ok(())
     }
 
-    pub(crate) fn append_tds_category_details_block(
-        s: &mut String,
+    pub(crate) fn write_tds_category_details_block(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
         obj: Option<&serde_json::Map<String, Value>>,
-    ) {
+    ) -> Result<()> {
         if let Some(obj) = obj {
-            s.push_str("<TDSCATEGORYDETAILS.LIST>\n");
-            XmlBuilder::append_simple_if(obj, "CATEGORYDATE", s);
-            XmlBuilder::append_simple_if(obj, "CATEGORYNAME", s);
-            s.push_str("</TDSCATEGORYDETAILS.LIST>\n");
+            XmlBuilder::write_start_tag(writer, "TDSCATEGORYDETAILS.LIST")?;
+            XmlBuilder::write_simple_if(writer, obj, "CATEGORYDATE")?;
+            XmlBuilder::write_simple_if(writer, obj, "CATEGORYNAME")?;
+            XmlBuilder::write_end_tag(writer, "TDSCATEGORYDETAILS.LIST")?;
         }
+        Ok(())
     }
 
-    pub(crate) fn append_statewise_details_block(
-        s: &mut String,
+    pub(crate) fn write_statewise_details_block(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
         obj: &serde_json::Map<String, Value>,
         state_fallback_any: bool,
         preserve_numeric_entity_state: bool,
-    ) {
-        s.push_str("<STATEWISEDETAILS.LIST>\n");
+    ) -> Result<()> {
+        XmlBuilder::write_start_tag(writer, "STATEWISEDETAILS.LIST")?;
         if let Some(name) = obj.get("STATENAME") {
             if preserve_numeric_entity_state
                 && name.is_string()
                 && name.as_str().unwrap_or("").starts_with("&#")
             {
                 if let Some(raw) = name.as_str() {
-                    s.push_str(&format!("<STATENAME>{raw}</STATENAME>\n"));
+                    XmlBuilder::write_text_node_escaped(writer, "STATENAME", raw)?;
                 }
             } else {
-                s.push_str(&format!(
-                    "<STATENAME>{}</STATENAME>\n",
-                    XmlBuilder::escape_text(name)
-                ));
+                XmlBuilder::write_simple(writer, "STATENAME", name)?;
             }
         } else if state_fallback_any {
-            s.push_str("<STATENAME>&#4; Any</STATENAME>\n");
+            XmlBuilder::write_text_node_escaped(writer, "STATENAME", "&#4; Any")?;
         }
         if let Some(rate) = obj.get("RATEDETAILS.LIST").and_then(|x| x.as_object()) {
-            XmlBuilder::append_rate_details_block(s, rate);
+            XmlBuilder::write_rate_details_block(writer, rate)?;
         }
-        s.push_str("</STATEWISEDETAILS.LIST>\n");
+        XmlBuilder::write_end_tag(writer, "STATEWISEDETAILS.LIST")?;
+        Ok(())
     }
 
-    pub(crate) fn append_rate_details_block(s: &mut String, obj: &serde_json::Map<String, Value>) {
-        s.push_str("<RATEDETAILS.LIST>\n");
+    pub(crate) fn write_rate_details_block(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        obj: &serde_json::Map<String, Value>,
+    ) -> Result<()> {
+        XmlBuilder::write_start_tag(writer, "RATEDETAILS.LIST")?;
         for key in ["GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE", "GSTRATE"] {
-            XmlBuilder::append_simple_if(obj, key, s);
+            XmlBuilder::write_simple_if(writer, obj, key)?;
         }
-        s.push_str("</RATEDETAILS.LIST>\n");
+        XmlBuilder::write_end_tag(writer, "RATEDETAILS.LIST")?;
+        Ok(())
     }
 
     pub(crate) fn write_simple(
@@ -147,7 +180,7 @@ impl XmlBuilder {
             return Ok(());
         }
         let text = XmlBuilder::escape_text(value);
-        XmlBuilder::write_text_node(writer, key, &text)
+        XmlBuilder::write_text_node_escaped(writer, key, &text)
     }
 
     pub(crate) fn write_text_node(
@@ -165,6 +198,118 @@ impl XmlBuilder {
             .write_event(Event::End(BytesEnd::new(key)))
             .map_err(|e| TallyError::Xml(e.to_string()))?;
         Ok(())
+    }
+
+    pub(crate) fn write_text_node_with_attrs(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        key: &str,
+        text: &str,
+        attrs: &[(&str, &str)],
+    ) -> Result<()> {
+        let mut start = BytesStart::new(key);
+        for (attr_key, attr_value) in attrs {
+            start.push_attribute((*attr_key, *attr_value));
+        }
+        writer
+            .write_event(Event::Start(start))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        writer
+            .write_event(Event::Text(BytesText::new(text)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        writer
+            .write_event(Event::End(BytesEnd::new(key)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn write_text_node_escaped(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        key: &str,
+        text: &str,
+    ) -> Result<()> {
+        writer
+            .write_event(Event::Start(BytesStart::new(key)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        writer
+            .write_event(Event::Text(BytesText::from_escaped(text)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        writer
+            .write_event(Event::End(BytesEnd::new(key)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn write_simple_if(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        obj: &serde_json::Map<String, Value>,
+        key: &str,
+    ) -> Result<()> {
+        if let Some(v) = obj.get(key) {
+            if !v.is_null() {
+                XmlBuilder::write_simple(writer, key, v)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_start_tag(writer: &mut Writer<Cursor<Vec<u8>>>, tag: &str) -> Result<()> {
+        writer
+            .write_event(Event::Start(BytesStart::new(tag)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn write_start_tag_with_attrs(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        tag: &str,
+        attrs: &[(&str, &str)],
+    ) -> Result<()> {
+        let mut start = BytesStart::new(tag);
+        for (key, value) in attrs {
+            start.push_attribute((*key, *value));
+        }
+        writer
+            .write_event(Event::Start(start))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn write_end_tag(writer: &mut Writer<Cursor<Vec<u8>>>, tag: &str) -> Result<()> {
+        writer
+            .write_event(Event::End(BytesEnd::new(tag)))
+            .map_err(|e| TallyError::Xml(e.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn write_export_envelope_header(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        tally_request: &str,
+        request_type: &str,
+        id: &str,
+    ) -> Result<()> {
+        XmlBuilder::write_start_tag(writer, "ENVELOPE")?;
+        XmlBuilder::write_start_tag(writer, "HEADER")?;
+        XmlBuilder::write_text_node(writer, "VERSION", "1")?;
+        XmlBuilder::write_text_node(writer, "TALLYREQUEST", tally_request)?;
+        XmlBuilder::write_text_node(writer, "TYPE", request_type)?;
+        XmlBuilder::write_text_node(writer, "ID", id)?;
+        XmlBuilder::write_end_tag(writer, "HEADER")?;
+        Ok(())
+    }
+
+    pub(crate) fn write_current_company_tag(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        current_company: Option<&str>,
+    ) -> Result<()> {
+        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
+            XmlBuilder::write_text_node(writer, "SVCURRENTCOMPANY", company.trim())?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn finish_writer(writer: Writer<Cursor<Vec<u8>>>) -> Result<String> {
+        let bytes = writer.into_inner().into_inner();
+        String::from_utf8(bytes).map_err(|e| TallyError::Xml(e.to_string()))
     }
 
     pub(crate) fn write_kv_recursive(
@@ -216,22 +361,6 @@ impl XmlBuilder {
         Ok(())
     }
 
-    pub(crate) fn append_simple_if(
-        obj: &serde_json::Map<String, Value>,
-        key: &str,
-        s: &mut String,
-    ) {
-        if let Some(v) = obj.get(key) {
-            if !v.is_null() {
-                s.push_str(&format!(
-                    "<{0}>{1}</{0}>\n",
-                    key,
-                    XmlBuilder::escape_text(v)
-                ));
-            }
-        }
-    }
-
     pub(crate) fn escape_text(v: &Value) -> String {
         XmlBuilder::escape_simple_allow_numeric_entities(&value_to_string(v))
     }
@@ -250,13 +379,17 @@ impl XmlBuilder {
         }
     }
 
-    fn append_name_entry(s: &mut String, value: &str, escape_value: bool) {
+    fn write_name_entry(
+        writer: &mut Writer<Cursor<Vec<u8>>>,
+        value: &str,
+        escape_value: bool,
+    ) -> Result<()> {
         let text = if escape_value {
             XmlBuilder::escape_simple(value)
         } else {
             value.to_string()
         };
-        s.push_str(&format!("<NAME>{text}</NAME>\n"));
+        XmlBuilder::write_text_node_escaped(writer, "NAME", &text)
     }
 }
 

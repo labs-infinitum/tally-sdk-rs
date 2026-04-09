@@ -1,7 +1,9 @@
 use super::TallyClient;
 use crate::errors::{Result, TallyError};
 use crate::xml_builder::XmlBuilder;
-use regex::Regex;
+use quick_xml::events::Event;
+use quick_xml::name::QName;
+use quick_xml::Reader;
 
 impl TallyClient {
     pub fn active_company_name(&self) -> Result<Option<String>> {
@@ -72,23 +74,100 @@ impl TallyClient {
         body.insert("DESC".into(), serde_json::Value::Object(desc));
         let xml = XmlBuilder::create_envelope(&header, Some(&body))?;
         let resp = self.post_raw_xml(&xml)?;
+        Ok(parse_current_company_name(&resp))
+    }
+}
 
-        let company_attr = Regex::new(r#"<COMPANY[^>]*\bNAME="([^"]+)""#)
-            .ok()
-            .and_then(|re| re.captures(&resp))
-            .and_then(|caps| caps.get(1))
-            .map(|m| m.as_str().trim().to_string())
-            .filter(|name| !name.is_empty());
-        if company_attr.is_some() {
-            return Ok(company_attr);
+fn parse_current_company_name(xml: &str) -> Option<String> {
+    let mut reader = Reader::from_reader(xml.as_bytes());
+    reader.trim_text(true);
+
+    let mut in_company = false;
+    let mut current_tag: Option<Vec<u8>> = None;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                let tag = e.name();
+                if tag == QName(b"COMPANY") {
+                    in_company = true;
+                    if let Some(name) = e
+                        .attributes()
+                        .flatten()
+                        .find(|attr| attr.key == QName(b"NAME"))
+                        .and_then(|attr| attr.unescape_value().ok())
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty())
+                    {
+                        return Some(name);
+                    }
+                }
+                current_tag = Some(tag.as_ref().to_vec());
+            }
+            Ok(Event::Empty(ref e)) => {
+                if e.name() == QName(b"COMPANY") {
+                    if let Some(name) = e
+                        .attributes()
+                        .flatten()
+                        .find(|attr| attr.key == QName(b"NAME"))
+                        .and_then(|attr| attr.unescape_value().ok())
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty())
+                    {
+                        return Some(name);
+                    }
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if in_company && current_tag.as_deref() == Some(b"NAME") {
+                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    if !text.is_empty() {
+                        return Some(text);
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                if e.name() == QName(b"COMPANY") {
+                    in_company = false;
+                }
+                current_tag = None;
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
         }
+    }
 
-        let company_tag = Regex::new(r"(?s)<COMPANY(?:\s[^>]*)?>.*?<NAME>(.*?)</NAME>")
-            .ok()
-            .and_then(|re| re.captures(&resp))
-            .and_then(|caps| caps.get(1))
-            .map(|m| m.as_str().trim().to_string())
-            .filter(|name| !name.is_empty());
-        Ok(company_tag)
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_current_company_name;
+
+    #[test]
+    fn parses_company_name_from_attribute_or_nested_name() {
+        let from_attr =
+            r#"<ENVELOPE><BODY><DATA><COMPANY NAME="ACME LLP" /></DATA></BODY></ENVELOPE>"#;
+        assert_eq!(
+            parse_current_company_name(from_attr).as_deref(),
+            Some("ACME LLP")
+        );
+
+        let from_name = r#"
+<ENVELOPE>
+  <BODY>
+    <DATA>
+      <COMPANY>
+        <NAME>Okeanos Software Solutions Private Limited</NAME>
+      </COMPANY>
+    </DATA>
+  </BODY>
+</ENVELOPE>
+"#;
+        assert_eq!(
+            parse_current_company_name(from_name).as_deref(),
+            Some("Okeanos Software Solutions Private Limited")
+        );
     }
 }

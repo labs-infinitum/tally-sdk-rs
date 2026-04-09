@@ -1,5 +1,7 @@
 use crate::errors::{Result, TallyError};
+use quick_xml::Writer;
 use serde_json::Value;
+use std::io::Cursor;
 
 use super::XmlBuilder;
 
@@ -54,87 +56,104 @@ impl XmlBuilder {
         to_date: Option<&str>,
         current_company: Option<&str>,
     ) -> Result<String> {
-        let from_date = from_date.unwrap_or("19000101");
-        let to_date = to_date.unwrap_or("99991231");
-        let from_date = format_tally_static_date(from_date)?;
-        let to_date = format_tally_static_date(to_date)?;
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        let from_date = format_tally_static_date(from_date.unwrap_or("19000101"))?;
+        let to_date = format_tally_static_date(to_date.unwrap_or("99991231"))?;
 
-        let mut static_variables = String::from(
-            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n\
-             <SVFROMDATE TYPE=\"Date\">",
-        );
-        static_variables.push_str(&from_date);
-        static_variables.push_str("</SVFROMDATE>\n<SVTODATE TYPE=\"Date\">");
-        static_variables.push_str(&to_date);
-        static_variables.push_str("</SVTODATE>");
-
-        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
-            static_variables.push_str("\n<SVCURRENTCOMPANY>");
-            static_variables.push_str(&XmlBuilder::escape_simple(company.trim()));
-            static_variables.push_str("</SVCURRENTCOMPANY>");
+        XmlBuilder::write_export_envelope_header(
+            &mut writer,
+            "EXPORT",
+            "COLLECTION",
+            "All Vouchers",
+        )?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
+        XmlBuilder::write_text_node_with_attrs(
+            &mut writer,
+            "SVFROMDATE",
+            &from_date,
+            &[("TYPE", "Date")],
+        )?;
+        XmlBuilder::write_text_node_with_attrs(
+            &mut writer,
+            "SVTODATE",
+            &to_date,
+            &[("TYPE", "Date")],
+        )?;
+        XmlBuilder::write_current_company_tag(&mut writer, current_company)?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "COLLECTION",
+            &[
+                ("NAME", "AllVouchers"),
+                ("ISFIXED", "Yes"),
+                ("FETCHALLFIELDS", "Yes"),
+            ],
+        )?;
+        XmlBuilder::write_text_node(&mut writer, "TYPE", "Voucher")?;
+        XmlBuilder::write_text_node(&mut writer, "NATIVEMETHOD", "*, *.*")?;
+        for field in [
+            "Date",
+            "VoucherNumber",
+            "VoucherTypeName",
+            "Amount",
+            "MasterID",
+            "PartyLedgerName",
+        ] {
+            XmlBuilder::write_text_node(&mut writer, "FETCH", field)?;
         }
+        XmlBuilder::write_end_tag(&mut writer, "COLLECTION")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
 
-        Ok(format!(
-            "<ENVELOPE>\
-<HEADER>\
-<VERSION>1</VERSION>\
-<TALLYREQUEST>EXPORT</TALLYREQUEST>\
-<TYPE>COLLECTION</TYPE>\
-<ID>All Vouchers</ID>\
-</HEADER>\
-<BODY>\
-<DESC>\
-<STATICVARIABLES>{static_variables}</STATICVARIABLES>\
-<TDL>\
-<TDLMESSAGE>\
-<COLLECTION NAME=\"AllVouchers\" ISFIXED=\"Yes\" FETCHALLFIELDS=\"Yes\">\
-<TYPE>Voucher</TYPE>\
-<NATIVEMETHOD>*, *.*</NATIVEMETHOD>\
-<FETCH>Date</FETCH>\
-<FETCH>VoucherNumber</FETCH>\
-<FETCH>VoucherTypeName</FETCH>\
-<FETCH>Amount</FETCH>\
-<FETCH>MasterID</FETCH>\
-<FETCH>PartyLedgerName</FETCH>\
-</COLLECTION>\
-</TDLMESSAGE>\
-</TDL>\
-</DESC>\
-</BODY>\
-</ENVELOPE>"
-        ))
+        XmlBuilder::finish_writer(writer)
     }
 
     pub fn create_currency_export_request(current_company: Option<&str>) -> Result<String> {
-        let mut static_variables = String::from("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>");
-        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
-            static_variables.push_str("\n<SVCURRENTCOMPANY>");
-            static_variables.push_str(&XmlBuilder::escape_simple(company.trim()));
-            static_variables.push_str("</SVCURRENTCOMPANY>");
-        }
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_export_envelope_header(
+            &mut writer,
+            "EXPORT",
+            "COLLECTION",
+            "CustomCurrencyCollection",
+        )?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
+        XmlBuilder::write_current_company_tag(&mut writer, current_company)?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "COLLECTION",
+            &[
+                ("NAME", "CustomCurrencyCollection"),
+                ("ISMODIFY", "No"),
+                ("ISFIXED", "No"),
+                ("ISINITIALIZE", "No"),
+                ("ISOPTION", "No"),
+                ("ISINTERNAL", "No"),
+            ],
+        )?;
+        XmlBuilder::write_text_node(&mut writer, "TYPE", "CURRENCY")?;
+        XmlBuilder::write_end_tag(&mut writer, "COLLECTION")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
 
-        Ok(format!(
-            "<ENVELOPE>\
-<HEADER>\
-<VERSION>1</VERSION>\
-<TALLYREQUEST>EXPORT</TALLYREQUEST>\
-<TYPE>COLLECTION</TYPE>\
-<ID>CustomCurrencyCollection</ID>\
-</HEADER>\
-<BODY>\
-<DESC>\
-<STATICVARIABLES>{static_variables}</STATICVARIABLES>\
-<TDL>\
-<TDLMESSAGE>\
-<COLLECTION NAME=\"CustomCurrencyCollection\" ISMODIFY=\"No\" ISFIXED=\"No\" ISINITIALIZE=\"No\" ISOPTION=\"No\" ISINTERNAL=\"No\">\
-<TYPE>CURRENCY</TYPE>\
-</COLLECTION>\
-</TDLMESSAGE>\
-</TDL>\
-</DESC>\
-</BODY>\
-</ENVELOPE>"
-        ))
+        XmlBuilder::finish_writer(writer)
     }
 
     pub fn create_builtin_report_request(
@@ -144,46 +163,39 @@ impl XmlBuilder {
         current_company: Option<&str>,
         explode_flag: bool,
     ) -> Result<String> {
-        let mut static_variables = String::from("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>");
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_export_envelope_header(&mut writer, "Export", "Data", report_name)?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
 
         if explode_flag {
-            static_variables.push_str("\n<EXPLODEFLAG>Yes</EXPLODEFLAG>");
+            XmlBuilder::write_text_node(&mut writer, "EXPLODEFLAG", "Yes")?;
         }
-
         if let Some(from) = from_date {
-            static_variables.push_str("\n<SVFROMDATE TYPE=\"Date\">");
-            static_variables.push_str(&format_tally_static_date(from)?);
-            static_variables.push_str("</SVFROMDATE>");
+            XmlBuilder::write_text_node_with_attrs(
+                &mut writer,
+                "SVFROMDATE",
+                &format_tally_static_date(from)?,
+                &[("TYPE", "Date")],
+            )?;
         }
-
         if let Some(to) = to_date {
-            static_variables.push_str("\n<SVTODATE TYPE=\"Date\">");
-            static_variables.push_str(&format_tally_static_date(to)?);
-            static_variables.push_str("</SVTODATE>");
+            XmlBuilder::write_text_node_with_attrs(
+                &mut writer,
+                "SVTODATE",
+                &format_tally_static_date(to)?,
+                &[("TYPE", "Date")],
+            )?;
         }
+        XmlBuilder::write_current_company_tag(&mut writer, current_company)?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
 
-        if let Some(company) = current_company.filter(|name| !name.trim().is_empty()) {
-            static_variables.push_str("\n<SVCURRENTCOMPANY>");
-            static_variables.push_str(&XmlBuilder::escape_simple(company.trim()));
-            static_variables.push_str("</SVCURRENTCOMPANY>");
-        }
-
-        Ok(format!(
-            "<ENVELOPE>\
-<HEADER>\
-<VERSION>1</VERSION>\
-<TALLYREQUEST>Export</TALLYREQUEST>\
-<TYPE>Data</TYPE>\
-<ID>{}</ID>\
-</HEADER>\
-<BODY>\
-<DESC>\
-<STATICVARIABLES>{static_variables}</STATICVARIABLES>\
-</DESC>\
-</BODY>\
-</ENVELOPE>",
-            XmlBuilder::escape_simple(report_name)
-        ))
+        XmlBuilder::finish_writer(writer)
     }
 }
 

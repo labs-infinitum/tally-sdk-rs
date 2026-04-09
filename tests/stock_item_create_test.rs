@@ -47,13 +47,6 @@ fn build_stock_item() -> StockItem {
     }
 }
 
-fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
-        .unwrap_or(0)
-}
-
 #[test]
 fn create_stock_item_and_verify() {
     let client = make_client();
@@ -77,12 +70,9 @@ fn create_stock_item_and_verify() {
     let resp = client
         .create_stock_item_debug(&item)
         .expect("create stock item");
-    if let Some(line_errors) = resp.get("LINEERROR") {
-        eprintln!("LINEERROR: {:?}", line_errors);
+    if !resp.line_errors.is_empty() {
+        eprintln!("LINEERROR: {:?}", resp.line_errors);
     }
-    let created = get_counter(&resp, "CREATED");
-    let altered = get_counter(&resp, "ALTERED");
-    let exceptions = get_counter(&resp, "EXCEPTIONS");
 
     // Poll verify
     let mut exists_after = false;
@@ -97,12 +87,12 @@ fn create_stock_item_and_verify() {
 
     if !existed_before {
         assert_eq!(
-            exceptions, 0,
+            resp.exceptions, 0,
             "Tally returned exceptions for stock item creation: {:?}",
             resp
         );
         assert!(
-            created > 0 || altered > 0 || exists_after,
+            resp.created > 0 || resp.altered > 0 || exists_after,
             "Expected CREATED/ALTERED or to find stock item after creation; resp={:?}",
             resp
         );

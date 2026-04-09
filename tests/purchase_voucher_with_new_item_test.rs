@@ -1,6 +1,6 @@
 use tally_sdk_rust::client::{parse_simple_response, TallyClient};
 use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::{ItemInvoice, Ledger, StockItem};
+use tally_sdk_rust::models::{ImportResult, ItemInvoice, Ledger, StockItem};
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -196,16 +196,6 @@ fn ensure_stock_item(client: &TallyClient, name: &str) {
     }
 }
 
-fn counters(v: &serde_json::Value) -> (i64, i64, i64) {
-    let get = |k: &str| {
-        v.get(k)
-            .and_then(|x| x.as_str())
-            .and_then(|s| s.parse::<i64>().ok())
-            .unwrap_or(0)
-    };
-    (get("CREATED"), get("ALTERED"), get("EXCEPTIONS"))
-}
-
 #[test]
 fn purchase_voucher_with_new_party_and_item() {
     let client = make_client();
@@ -267,10 +257,13 @@ fn purchase_voucher_with_new_party_and_item() {
     let resp = client.post_xml(&xml).expect("post voucher");
     println!("\n==== Raw Response ===\n{}\n====================\n", resp);
     let parsed = parse_simple_response(&resp);
-    let (created, altered, exceptions) = counters(&parsed);
-    assert_eq!(exceptions, 0, "voucher creation exceptions: {:?}", parsed);
+    assert_eq!(
+        parsed.exceptions, 0,
+        "voucher creation exceptions: {:?}",
+        parsed
+    );
     assert!(
-        created > 0 || altered > 0,
+        parsed.created > 0 || parsed.altered > 0,
         "voucher not created/altered: {:?}",
         parsed
     );

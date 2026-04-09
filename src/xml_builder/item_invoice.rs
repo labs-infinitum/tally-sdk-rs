@@ -9,72 +9,75 @@ impl XmlBuilder {
             .get("VOUCHERTYPENAME")
             .and_then(|s| s.as_str())
             .unwrap_or("Sales");
-        let mut s = String::new();
-        XmlBuilder::append_all_masters_import_start(&mut s);
-        s.push_str(&format!(
-            "<VOUCHER VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\">\n",
-            XmlBuilder::escape_simple(name)
-        ));
-        for tag in [
-            "DATE",
-            "VCHENTRYMODE",
-            "VOUCHERNUMBER",
-            "NARRATION",
-            "REFERENCE",
-            "REFERENCEDATE",
-            "BASICSHIPDOCUMENTNO",
-            "BASICSHIPPEDBY",
-            "BASICFINALDESTINATION",
-            "EICHECKPOST",
-            "BILLOFLADINGNO",
-            "BILLOFLADINGDATE",
-            "BASICSHIPVESSELNO",
-        ] {
-            XmlBuilder::append_simple_if(vch, tag, &mut s);
-        }
-        if let Some(inv) = vch
-            .get("ALLINVENTORYENTRIES.LIST")
-            .and_then(|x| x.as_object())
-        {
-            s.push_str("<ALLINVENTORYENTRIES.LIST>\n");
+        XmlBuilder::create_all_masters_import_request(|writer| {
+            XmlBuilder::write_start_tag_with_attrs(
+                writer,
+                "VOUCHER",
+                &[
+                    ("VCHTYPE", name),
+                    ("ACTION", "Create"),
+                    ("OBJVIEW", "Invoice Voucher View"),
+                ],
+            )?;
             for tag in [
-                "STOCKITEMNAME",
-                "ISDEEMEDPOSITIVE",
-                "RATE",
-                "AMOUNT",
-                "ACTUALQTY",
-                "BILLEDQTY",
+                "DATE",
+                "VCHENTRYMODE",
+                "VOUCHERNUMBER",
+                "NARRATION",
+                "REFERENCE",
+                "REFERENCEDATE",
+                "BASICSHIPDOCUMENTNO",
+                "BASICSHIPPEDBY",
+                "BASICFINALDESTINATION",
+                "EICHECKPOST",
+                "BILLOFLADINGNO",
+                "BILLOFLADINGDATE",
+                "BASICSHIPVESSELNO",
             ] {
-                XmlBuilder::append_simple_if(inv, tag, &mut s);
+                XmlBuilder::write_simple_if(writer, vch, tag)?;
             }
-            if let Some(acc) = inv
-                .get("ACCOUNTINGALLOCATIONS.LIST")
+            if let Some(inv) = vch
+                .get("ALLINVENTORYENTRIES.LIST")
                 .and_then(|x| x.as_object())
             {
-                s.push_str("<ACCOUNTINGALLOCATIONS.LIST>\n");
-                for tag in ["LEDGERNAME", "ISDEEMEDPOSITIVE", "AMOUNT"] {
-                    XmlBuilder::append_simple_if(acc, tag, &mut s);
+                XmlBuilder::write_start_tag(writer, "ALLINVENTORYENTRIES.LIST")?;
+                for tag in [
+                    "STOCKITEMNAME",
+                    "ISDEEMEDPOSITIVE",
+                    "RATE",
+                    "AMOUNT",
+                    "ACTUALQTY",
+                    "BILLEDQTY",
+                ] {
+                    XmlBuilder::write_simple_if(writer, inv, tag)?;
                 }
-                s.push_str("</ACCOUNTINGALLOCATIONS.LIST>\n");
+                if let Some(acc) = inv
+                    .get("ACCOUNTINGALLOCATIONS.LIST")
+                    .and_then(|x| x.as_object())
+                {
+                    XmlBuilder::write_start_tag(writer, "ACCOUNTINGALLOCATIONS.LIST")?;
+                    for tag in ["LEDGERNAME", "ISDEEMEDPOSITIVE", "AMOUNT"] {
+                        XmlBuilder::write_simple_if(writer, acc, tag)?;
+                    }
+                    XmlBuilder::write_end_tag(writer, "ACCOUNTINGALLOCATIONS.LIST")?;
+                }
+                XmlBuilder::write_end_tag(writer, "ALLINVENTORYENTRIES.LIST")?;
             }
-            s.push_str("</ALLINVENTORYENTRIES.LIST>\n");
-        }
-        if let Some(party) = vch.get("LEDGERENTRIES.LIST").and_then(|x| x.as_object()) {
-            s.push_str("<LEDGERENTRIES.LIST>\n");
-            for tag in ["LEDGERNAME", "ISDEEMEDPOSITIVE", "AMOUNT", "ISPARTYLEDGER"] {
-                XmlBuilder::append_simple_if(party, tag, &mut s);
+            if let Some(party) = vch.get("LEDGERENTRIES.LIST").and_then(|x| x.as_object()) {
+                XmlBuilder::write_start_tag(writer, "LEDGERENTRIES.LIST")?;
+                for tag in ["LEDGERNAME", "ISDEEMEDPOSITIVE", "AMOUNT", "ISPARTYLEDGER"] {
+                    XmlBuilder::write_simple_if(writer, party, tag)?;
+                }
+                XmlBuilder::write_end_tag(writer, "LEDGERENTRIES.LIST")?;
             }
-            s.push_str("</LEDGERENTRIES.LIST>\n");
-        }
-        if let Some(del) = vch.get("INVOICEDELNOTES.LIST").and_then(|x| x.as_object()) {
-            s.push_str("<INVOICEDELNOTES.LIST>\n");
-            for tag in ["BASICSHIPPINGDATE", "BASICSHIPDELIVERYNOTE"] {
-                XmlBuilder::append_simple_if(del, tag, &mut s);
+            if let Some(del) = vch.get("INVOICEDELNOTES.LIST").and_then(|x| x.as_object()) {
+                XmlBuilder::write_start_tag(writer, "INVOICEDELNOTES.LIST")?;
+                for tag in ["BASICSHIPPINGDATE", "BASICSHIPDELIVERYNOTE"] {
+                    XmlBuilder::write_simple_if(writer, del, tag)?;
+                }
+                XmlBuilder::write_end_tag(writer, "INVOICEDELNOTES.LIST")?;
             }
-            s.push_str("</INVOICEDELNOTES.LIST>\n");
-        }
-        s.push_str("</VOUCHER>\n");
-        XmlBuilder::append_import_end(&mut s);
-        Ok(s)
+            XmlBuilder::write_end_tag(writer, "VOUCHER")
+        })
     }
 }

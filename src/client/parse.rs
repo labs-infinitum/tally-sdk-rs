@@ -1,51 +1,86 @@
-use regex::Regex;
+use crate::models::ImportResult;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 
-pub fn parse_simple_response_public(xml: &str) -> serde_json::Value {
-    // Handle both <RESPONSE> and ENVELOPE IMPORTRESULT blocks using regex extras like Python's fallback
-    let cleaned = clean_xml(xml);
-    // Try to pull common tally counters
-    let keys = [
-        "CREATED",
-        "ALTERED",
-        "DELETED",
-        "LASTVCHID",
-        "LASTMID",
-        "COMBINED",
-        "IGNORED",
-        "ERRORS",
-        "CANCELLED",
-        "EXCEPTIONS",
-    ];
-    let mut obj = serde_json::Map::new();
-    for k in keys.iter() {
-        if let Some(v) = capture_tag(&cleaned, k) {
-            obj.insert((*k).into(), serde_json::Value::String(v));
-        }
-    }
-    if let Ok(re) = Regex::new(r"<LINEERROR>(.*?)</LINEERROR>") {
-        let mut errors: Vec<serde_json::Value> = Vec::new();
-        for cap in re.captures_iter(&cleaned) {
-            if let Some(m) = cap.get(1) {
-                errors.push(serde_json::Value::String(m.as_str().to_string()));
+pub fn parse_simple_response_public(xml: &str) -> ImportResult {
+    let mut reader = Reader::from_reader(xml.as_bytes());
+    reader.trim_text(true);
+
+    let mut current_tag: Option<Vec<u8>> = None;
+    let mut result = ImportResult::default();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                current_tag = Some(e.name().as_ref().to_vec());
             }
-        }
-        if !errors.is_empty() {
-            obj.insert("LINEERROR".into(), serde_json::Value::Array(errors));
+            Ok(Event::Text(ref e)) => {
+                let Some(tag) = current_tag.as_deref() else {
+                    continue;
+                };
+                let text = e.unescape().unwrap_or_default().trim().to_string();
+                if text.is_empty() {
+                    continue;
+                }
+
+                match tag {
+                    b"CREATED" => result.created = parse_counter(&text),
+                    b"ALTERED" => result.altered = parse_counter(&text),
+                    b"DELETED" => result.deleted = parse_counter(&text),
+                    b"COMBINED" => result.combined = parse_counter(&text),
+                    b"IGNORED" => result.ignored = parse_counter(&text),
+                    b"ERRORS" => result.errors = parse_counter(&text),
+                    b"CANCELLED" => result.cancelled = parse_counter(&text),
+                    b"EXCEPTIONS" => result.exceptions = parse_counter(&text),
+                    b"LASTVCHID" => result.last_voucher_id = Some(text),
+                    b"LASTMID" => result.last_master_id = Some(text),
+                    b"LINEERROR" => result.line_errors.push(text),
+                    _ => {}
+                }
+            }
+            Ok(Event::End(_)) => {
+                current_tag = None;
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
         }
     }
-    serde_json::Value::Object(obj)
+
+    result
 }
 
-fn capture_tag(xml: &str, tag: &str) -> Option<String> {
-    let re = Regex::new(&format!(r"<{0}>(.*?)</{0}>", regex::escape(tag))).ok()?;
-    re.captures(xml)
-        .and_then(|c| c.get(1))
-        .map(|m| m.as_str().to_string())
+fn parse_counter(text: &str) -> i64 {
+    text.parse::<i64>().unwrap_or(0)
 }
 
-fn clean_xml(s: &str) -> String {
-    // remove numeric char refs like &#4;
-    let re = Regex::new(r"&#\d+;").unwrap();
-    let cleaned = re.replace_all(s, "");
-    cleaned.to_string()
+#[cfg(test)]
+mod tests {
+    use super::parse_simple_response_public;
+
+    #[test]
+    fn parses_import_result_counters_and_line_errors() {
+        let xml = r#"
+<ENVELOPE>
+  <BODY>
+    <DATA>
+      <IMPORTRESULT>
+        <CREATED>1</CREATED>
+        <ALTERED>0</ALTERED>
+        <ERRORS>1</ERRORS>
+        <LINEERROR>Could not find Company ''</LINEERROR>
+        <LINEERROR>Voucher number missing</LINEERROR>
+      </IMPORTRESULT>
+    </DATA>
+  </BODY>
+</ENVELOPE>
+"#;
+
+        let value = parse_simple_response_public(xml);
+        assert_eq!(value.created, 1);
+        assert_eq!(value.altered, 0);
+        assert_eq!(value.errors, 1);
+        assert_eq!(value.line_errors[0], "Could not find Company ''");
+        assert_eq!(value.line_errors[1], "Voucher number missing");
+    }
 }

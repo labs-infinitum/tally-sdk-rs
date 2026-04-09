@@ -1,6 +1,7 @@
 mod collection;
 mod group;
 mod helpers;
+mod import;
 mod item_invoice;
 mod ledger;
 mod report;
@@ -11,6 +12,7 @@ mod voucher;
 
 pub use collection::{CurrencySummary, GroupSummary, LedgerSummary, StockItemSummary};
 pub use group::Group;
+pub use import::ImportResult;
 pub use item_invoice::ItemInvoice;
 pub use ledger::Ledger;
 pub use report::{BalanceSheetEntry, ProfitAndLossEntry, TrialBalanceEntry};

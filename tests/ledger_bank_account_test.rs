@@ -104,13 +104,6 @@ fn build_bank_account_ledger() -> Ledger {
     }
 }
 
-fn get_counter(v: &serde_json::Value, key: &str) -> i64 {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .and_then(|s| s.parse::<i64>().ok())
-        .unwrap_or(0)
-}
-
 #[test]
 fn create_bank_account_ledger_full_details() {
     let client = make_client();
@@ -130,10 +123,6 @@ fn create_bank_account_ledger_full_details() {
     let existed_before = before.iter().any(|entry| entry.name == ledger.name);
     let resp = client.create_ledger(&ledger).expect("create ledger");
 
-    let created = get_counter(&resp, "CREATED");
-    let altered = get_counter(&resp, "ALTERED");
-    let exceptions = get_counter(&resp, "EXCEPTIONS");
-
     // If it didn't exist before, ensure counters or presence after polling
     let mut exists_after = false;
     for _ in 0..6 {
@@ -148,12 +137,12 @@ fn create_bank_account_ledger_full_details() {
     if !existed_before {
         // Ensure success (created/altered) or at least existence now, and no exceptions
         assert!(
-            exceptions == 0,
+            resp.exceptions == 0,
             "Tally returned exceptions for creation: {:?}",
             resp
         );
         assert!(
-            created > 0 || altered > 0 || exists_after,
+            resp.created > 0 || resp.altered > 0 || exists_after,
             "Expected CREATED/ALTERED counters or to find ledger after creation; resp={:?}",
             resp
         );

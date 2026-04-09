@@ -9,81 +9,90 @@ impl XmlBuilder {
             .get("NAME")
             .and_then(|v| v.as_str())
             .ok_or_else(|| TallyError::Validation("Group NAME is required".into()))?;
-        let mut s = String::new();
-        XmlBuilder::append_all_masters_import_start(&mut s);
-        s.push_str(&format!(
-            "<GROUP NAME=\"{}\" RESERVEDNAME=\"\">\n",
-            XmlBuilder::escape_simple(name)
-        ));
-        XmlBuilder::append_parent_tag(
-            &mut s,
-            group_map.get("PARENT").and_then(|v| v.as_str()),
-            true,
-        );
-        for k in [
-            "ISADDABLE",
-            "BASICGROUPISCALCULABLE",
-            "ASORIGINAL",
-            "ISSUBLEDGER",
-            "ADDLALLOCTYPE",
-            "AFFECTSGROSSPROFIT",
-        ] {
-            XmlBuilder::append_simple_if(group_map, k, &mut s);
-        }
-
-        if let Some(Value::String(gt)) = group_map.get("GROUP_TYPE") {
-            match gt.as_str() {
-                "Assets" => {
-                    s.push_str("<ISREVENUE>No</ISREVENUE>\n<AFFECTSGROSSPROFIT>No</AFFECTSGROSSPROFIT>\n<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n<AFFECTSSTOCK>No</AFFECTSSTOCK>\n");
-                }
-                "Liabilities" => {
-                    s.push_str("<ISREVENUE>No</ISREVENUE>\n<AFFECTSGROSSPROFIT>No</AFFECTSGROSSPROFIT>\n<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n<AFFECTSSTOCK>No</AFFECTSSTOCK>\n");
-                }
-                "Income" => {
-                    s.push_str("<ISREVENUE>Yes</ISREVENUE>\n<AFFECTSGROSSPROFIT>Yes</AFFECTSGROSSPROFIT>\n<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n<AFFECTSSTOCK>No</AFFECTSSTOCK>\n");
-                }
-                "Expenses" => {
-                    s.push_str("<ISREVENUE>Yes</ISREVENUE>\n<AFFECTSGROSSPROFIT>No</AFFECTSGROSSPROFIT>\n<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n<AFFECTSSTOCK>No</AFFECTSSTOCK>\n");
-                }
-                _ => {}
+        XmlBuilder::create_all_masters_import_request(|writer| {
+            XmlBuilder::write_start_tag_with_attrs(
+                writer,
+                "GROUP",
+                &[("NAME", name), ("RESERVEDNAME", "")],
+            )?;
+            XmlBuilder::write_parent_tag(
+                writer,
+                group_map.get("PARENT").and_then(|v| v.as_str()),
+                true,
+            )?;
+            for key in [
+                "ISADDABLE",
+                "BASICGROUPISCALCULABLE",
+                "ASORIGINAL",
+                "ISSUBLEDGER",
+                "ADDLALLOCTYPE",
+                "AFFECTSGROSSPROFIT",
+            ] {
+                XmlBuilder::write_simple_if(writer, group_map, key)?;
             }
-        }
 
-        XmlBuilder::append_hsn_details_block(
-            &mut s,
-            group_map.get("HSNDETAILS.LIST").and_then(|v| v.as_object()),
-            &[
-                "APPLICABLEFROM",
-                "SRCOFHSNDETAILS",
-                "HSNCODE",
-                "HSN",
-                "HSNCLASSIFICATIONNAME",
-            ],
-        );
-        XmlBuilder::append_gst_details_block(
-            &mut s,
-            group_map.get("GSTDETAILS.LIST").and_then(|v| v.as_object()),
-            &[
-                "APPLICABLEFROM",
-                "HSNMASTERNAME",
-                "TAXABILITY",
-                "SRCOFGSTDETAILS",
-            ],
-            true,
-            false,
-        );
-        XmlBuilder::append_language_name_list(&mut s, name, group_map.get("ALIAS"), true, true);
+            if let Some(Value::String(group_type)) = group_map.get("GROUP_TYPE") {
+                match group_type.as_str() {
+                    "Assets" => {
+                        XmlBuilder::write_text_node(writer, "ISREVENUE", "No")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSGROSSPROFIT", "No")?;
+                        XmlBuilder::write_text_node(writer, "ISDEEMEDPOSITIVE", "Yes")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSSTOCK", "No")?;
+                    }
+                    "Liabilities" => {
+                        XmlBuilder::write_text_node(writer, "ISREVENUE", "No")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSGROSSPROFIT", "No")?;
+                        XmlBuilder::write_text_node(writer, "ISDEEMEDPOSITIVE", "No")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSSTOCK", "No")?;
+                    }
+                    "Income" => {
+                        XmlBuilder::write_text_node(writer, "ISREVENUE", "Yes")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSGROSSPROFIT", "Yes")?;
+                        XmlBuilder::write_text_node(writer, "ISDEEMEDPOSITIVE", "No")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSSTOCK", "No")?;
+                    }
+                    "Expenses" => {
+                        XmlBuilder::write_text_node(writer, "ISREVENUE", "Yes")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSGROSSPROFIT", "No")?;
+                        XmlBuilder::write_text_node(writer, "ISDEEMEDPOSITIVE", "Yes")?;
+                        XmlBuilder::write_text_node(writer, "AFFECTSSTOCK", "No")?;
+                    }
+                    _ => {}
+                }
+            }
 
-        XmlBuilder::append_simple_if(group_map, "TDSAPPLICABLE", &mut s);
-        XmlBuilder::append_tds_category_details_block(
-            &mut s,
-            group_map
-                .get("TDSCATEGORYDETAILS.LIST")
-                .and_then(|v| v.as_object()),
-        );
-
-        s.push_str("</GROUP>\n");
-        XmlBuilder::append_import_end(&mut s);
-        Ok(s)
+            XmlBuilder::write_hsn_details_block(
+                writer,
+                group_map.get("HSNDETAILS.LIST").and_then(|v| v.as_object()),
+                &[
+                    "APPLICABLEFROM",
+                    "SRCOFHSNDETAILS",
+                    "HSNCODE",
+                    "HSN",
+                    "HSNCLASSIFICATIONNAME",
+                ],
+            )?;
+            XmlBuilder::write_gst_details_block(
+                writer,
+                group_map.get("GSTDETAILS.LIST").and_then(|v| v.as_object()),
+                &[
+                    "APPLICABLEFROM",
+                    "HSNMASTERNAME",
+                    "TAXABILITY",
+                    "SRCOFGSTDETAILS",
+                ],
+                true,
+                false,
+            )?;
+            XmlBuilder::write_language_name_list(writer, name, group_map.get("ALIAS"), true, true)?;
+            XmlBuilder::write_simple_if(writer, group_map, "TDSAPPLICABLE")?;
+            XmlBuilder::write_tds_category_details_block(
+                writer,
+                group_map
+                    .get("TDSCATEGORYDETAILS.LIST")
+                    .and_then(|v| v.as_object()),
+            )?;
+            XmlBuilder::write_end_tag(writer, "GROUP")
+        })
     }
 }

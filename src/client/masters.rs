@@ -5,47 +5,48 @@ use super::extract::{
 use super::{parse, TallyClient};
 use crate::errors::Result;
 use crate::models::{
-    CurrencySummary, Group, GroupSummary, Ledger, LedgerSummary, StockItem, StockItemSummary,
+    CurrencySummary, Group, GroupSummary, ImportResult, Ledger, LedgerSummary, StockItem,
+    StockItemSummary,
 };
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
-    pub fn create_ledger(&self, ledger: &Ledger) -> Result<serde_json::Value> {
+    pub fn create_ledger(&self, ledger: &Ledger) -> Result<ImportResult> {
         ledger.validate()?;
         let map = ledger.to_map();
         let xml = XmlBuilder::create_ledger_request(&map)?;
         self.execute_create_request(&xml)
     }
 
-    pub fn create_ledger_debug(&self, ledger: &Ledger) -> Result<serde_json::Value> {
+    pub fn create_ledger_debug(&self, ledger: &Ledger) -> Result<ImportResult> {
         ledger.validate()?;
         let map = ledger.to_map();
         let xml = XmlBuilder::create_ledger_request(&map)?;
         self.execute_debug_create_request(&xml)
     }
 
-    pub fn create_group(&self, group: &Group) -> Result<serde_json::Value> {
+    pub fn create_group(&self, group: &Group) -> Result<ImportResult> {
         group.validate()?;
         let map = group.to_map();
         let xml = XmlBuilder::create_group_request(&map)?;
         self.execute_create_request(&xml)
     }
 
-    pub fn create_group_debug(&self, group: &Group) -> Result<serde_json::Value> {
+    pub fn create_group_debug(&self, group: &Group) -> Result<ImportResult> {
         group.validate()?;
         let map = group.to_map();
         let xml = XmlBuilder::create_group_request(&map)?;
         self.execute_debug_create_request(&xml)
     }
 
-    pub fn create_stock_item(&self, item: &StockItem) -> Result<serde_json::Value> {
+    pub fn create_stock_item(&self, item: &StockItem) -> Result<ImportResult> {
         item.validate()?;
         let map = item.to_map();
         let xml = XmlBuilder::create_stock_item_request(&map)?;
         self.execute_create_request(&xml)
     }
 
-    pub fn create_stock_item_debug(&self, item: &StockItem) -> Result<serde_json::Value> {
+    pub fn create_stock_item_debug(&self, item: &StockItem) -> Result<ImportResult> {
         item.validate()?;
         let map = item.to_map();
         let xml = XmlBuilder::create_stock_item_request(&map)?;
@@ -71,12 +72,12 @@ impl TallyClient {
         Ok(extract_currencies_from_xml(&resp))
     }
 
-    fn execute_create_request(&self, xml: &str) -> Result<serde_json::Value> {
+    fn execute_create_request(&self, xml: &str) -> Result<ImportResult> {
         let resp = self.post_xml(xml)?;
         Ok(parse::parse_simple_response_public(&resp))
     }
 
-    fn execute_debug_create_request(&self, xml: &str) -> Result<serde_json::Value> {
+    fn execute_debug_create_request(&self, xml: &str) -> Result<ImportResult> {
         let prepared = self.prepare_request_xml(xml)?;
         println!(
             "\n================ XML Request ================\nPOST {}\nContent-Type: text/xml\n\n{}\n============================================\n",
