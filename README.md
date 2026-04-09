@@ -290,4 +290,6 @@ The integration tests expect a reachable Tally instance. If no company is active
 
 ## License
 
-Add the appropriate license for this repository here.
+This repository is licensed under the Apache License 2.0.
+
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).

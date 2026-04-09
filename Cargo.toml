@@ -2,6 +2,9 @@
 name = "tally-sdk-rust"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/labs-infinitum/tally-sdk-rs"
+description = "Rust SDK for TallyPrime XML/HTTP integration with typed APIs for masters, vouchers, and financial reports."
 
 [dependencies]
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"] }
