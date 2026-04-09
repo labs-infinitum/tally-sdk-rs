@@ -10,7 +10,7 @@ mod voucher;
 pub use group::Group;
 pub use item_invoice::ItemInvoice;
 pub use ledger::Ledger;
-pub use report::{BalanceSheetEntry, TrialBalanceEntry};
+pub use report::{BalanceSheetEntry, ProfitAndLossEntry, TrialBalanceEntry};
 pub use stock_group::StockGroup;
 pub use stock_item::StockItem;
 pub use unit::Unit;

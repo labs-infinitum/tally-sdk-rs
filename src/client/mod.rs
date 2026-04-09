@@ -1,6 +1,8 @@
 use crate::config::TallyConfig;
 use crate::errors::{Result, TallyError};
-use crate::models::{BalanceSheetEntry, Group, Ledger, StockItem, TrialBalanceEntry, Voucher};
+use crate::models::{
+    BalanceSheetEntry, Group, Ledger, ProfitAndLossEntry, StockItem, TrialBalanceEntry, Voucher,
+};
 use crate::xml_builder::XmlBuilder;
 use regex::Regex;
 use std::sync::Mutex;
@@ -206,6 +208,17 @@ impl TallyClient {
         Ok(report_parser::parse_balance_sheet_from_xml(&resp))
     }
 
+    pub fn get_profit_and_loss(
+        &self,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+        explode_flag: bool,
+    ) -> Result<Vec<ProfitAndLossEntry>> {
+        let resp =
+            self.export_builtin_report("Profit and Loss", from_date, to_date, explode_flag)?;
+        Ok(report_parser::parse_profit_and_loss_from_xml(&resp))
+    }
+
     pub fn active_company_name(&self) -> Result<Option<String>> {
         self.current_company_name()
     }
@@ -311,11 +324,7 @@ impl TallyClient {
         )?;
         self.post_xml(&xml)
     }
-}
 
-pub use parse::parse_simple_response_public as parse_simple_response;
-
-impl TallyClient {
     /// Fetch vouchers from Tally server
     ///
     /// # Arguments
@@ -351,6 +360,8 @@ impl TallyClient {
             .collect())
     }
 }
+
+pub use parse::parse_simple_response_public as parse_simple_response;
 
 fn is_yyyymmdd_in_range(date: &str, from_date: &str, to_date: &str) -> bool {
     if date.len() != 8 || from_date.len() != 8 || to_date.len() != 8 {

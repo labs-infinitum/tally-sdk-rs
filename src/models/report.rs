@@ -11,3 +11,10 @@ pub struct BalanceSheetEntry {
     pub main_amount: Option<f64>,
     pub sub_amount: Option<f64>,
 }
+
+#[derive(Debug, Clone)]
+pub struct ProfitAndLossEntry {
+    pub name: String,
+    pub main_amount: Option<f64>,
+    pub sub_amount: Option<f64>,
+}
