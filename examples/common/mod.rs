@@ -85,22 +85,33 @@ pub fn format_amount(value: Option<f64>) -> String {
 pub fn summarize_voucher(voucher: &Voucher) -> String {
     let voucher_number = voucher.voucher_number.as_deref().unwrap_or("-");
     let party = voucher.party_ledger_name.as_deref().unwrap_or("-");
-    let amount = voucher
-        .entries
-        .iter()
-        .find(|entry| entry.is_party_ledger)
+    let party_entry = voucher.entries.iter().find(|entry| entry.is_party_ledger);
+    let amount = party_entry
         .map(|entry| entry.amount)
         .or(voucher.amount.map(|amount| amount.abs()))
         .unwrap_or(0.0);
+    let forex = party_entry
+        .and_then(|entry| entry.forex.as_ref())
+        .or(voucher.amount_forex.as_ref());
 
-    format!(
+    let mut summary = format!(
         "{} | {} | no. {} | party {} | amount {:.2}",
         format_yyyymmdd(&voucher.date_yyyymmdd),
         voucher.voucher_type,
         voucher_number,
         party,
         amount
-    )
+    );
+    if let Some(forex) = forex {
+        summary.push_str(&format!(
+            " | fx {:.4} {} @ {}{:.6}",
+            forex.foreign_amount.abs(),
+            forex.foreign_currency,
+            forex.base_currency,
+            forex.exchange_rate
+        ));
+    }
+    summary
 }
 
 pub fn summarize_entry(entry: &VoucherEntry) -> String {
@@ -110,10 +121,20 @@ pub fn summarize_entry(entry: &VoucherEntry) -> String {
     } else {
         ""
     };
-    format!(
+    let mut summary = format!(
         "{} | {} {:.2}{}",
         entry.ledger_name, side, entry.amount, party
-    )
+    );
+    if let Some(forex) = &entry.forex {
+        summary.push_str(&format!(
+            " | fx {:.4} {} @ {}{:.6}",
+            forex.foreign_amount,
+            forex.foreign_currency,
+            forex.base_currency,
+            forex.exchange_rate
+        ));
+    }
+    summary
 }
 
 fn current_financial_year() -> (String, String) {

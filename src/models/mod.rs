@@ -22,5 +22,6 @@ pub use stock_group::StockGroup;
 pub use stock_item::StockItem;
 pub use unit::Unit;
 pub use voucher::{
-    AccountingAllocation, BatchAllocation, GstRateDetail, Item, Voucher, VoucherEntry,
+    AccountingAllocation, BatchAllocation, ForexDetails, GstRateDetail, Item, Voucher,
+    VoucherEntry,
 };

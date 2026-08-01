@@ -1,9 +1,12 @@
 use crate::models::{
-    AccountingAllocation, BatchAllocation, GstRateDetail, Item, Voucher, VoucherEntry,
+    AccountingAllocation, BatchAllocation, ForexDetails, GstRateDetail, Item, Voucher,
+    VoucherEntry,
 };
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
+use regex::Regex;
+use std::sync::OnceLock;
 
 pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut reader = Reader::from_reader(xml.as_bytes());
@@ -19,6 +22,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut voucher_date: Option<String> = None;
     let mut voucher_type: Option<String> = None;
     let mut voucher_amount: Option<f32> = None;
+    let mut voucher_amount_forex: Option<ForexDetails> = None;
     let mut voucher_number: Option<String> = None;
     let mut reference: Option<String> = None;
     let mut reference_date: Option<String> = None;
@@ -39,6 +43,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     // Item level fields
     let mut item_name: Option<String> = None;
     let mut item_amount: Option<f32> = None;
+    let mut item_forex: Option<ForexDetails> = None;
     let mut item_rate: Option<f32> = None;
     let mut item_discount: Option<f32> = None;
     let mut item_actual_qty: Option<f32> = None;
@@ -52,12 +57,14 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut batch_godown: Option<String> = None;
     let mut batch_name: Option<String> = None;
     let mut batch_amount: Option<f32> = None;
+    let mut batch_forex: Option<ForexDetails> = None;
     let mut batch_actual_qty: Option<f32> = None;
     let mut batch_billed_qty: Option<f32> = None;
 
     // Accounting allocation fields
     let mut acct_ledger_name: Option<String> = None;
     let mut acct_amount: Option<f32> = None;
+    let mut acct_forex: Option<ForexDetails> = None;
     let mut acct_is_deemed_positive: Option<String> = None;
 
     // GST Rate detail fields
@@ -68,6 +75,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     // Ledger entry fields
     let mut ledger_entry_name: Option<String> = None;
     let mut ledger_entry_amount: Option<f32> = None;
+    let mut ledger_entry_forex: Option<ForexDetails> = None;
     let mut ledger_entry_is_party: Option<String> = None;
 
     // Collections
@@ -94,6 +102,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         voucher_date = None;
                         voucher_type = None;
                         voucher_amount = None;
+                        voucher_amount_forex = None;
                         voucher_number = None;
                         reference = None;
                         reference_date = None;
@@ -127,6 +136,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         // Reset item level fields
                         item_name = None;
                         item_amount = None;
+                        item_forex = None;
                         item_rate = None;
                         item_discount = None;
                         item_actual_qty = None;
@@ -143,12 +153,14 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         batch_godown = None;
                         batch_name = None;
                         batch_amount = None;
+                        batch_forex = None;
                         batch_actual_qty = None;
                         batch_billed_qty = None;
                     }
                     QName(b"ACCOUNTINGALLOCATIONS.LIST") => {
                         acct_ledger_name = None;
                         acct_amount = None;
+                        acct_forex = None;
                         acct_is_deemed_positive = None;
                     }
                     QName(b"RATEDETAILS.LIST") => {
@@ -159,11 +171,13 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                     QName(b"LEDGERENTRIES.LIST") => {
                         ledger_entry_name = None;
                         ledger_entry_amount = None;
+                        ledger_entry_forex = None;
                         ledger_entry_is_party = None;
                     }
                     QName(b"ALLLEDGERENTRIES.LIST") => {
                         ledger_entry_name = None;
                         ledger_entry_amount = None;
+                        ledger_entry_forex = None;
                         ledger_entry_is_party = None;
                     }
                     _ => {}
@@ -181,6 +195,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             action: voucher_action.clone(),
                             date_yyyymmdd: voucher_date.clone().unwrap_or_default(),
                             amount: voucher_amount,
+                            amount_forex: voucher_amount_forex.clone(),
                             voucher_number: voucher_number.clone(),
                             reference: reference.clone(),
                             party_ledger_name: party_ledger_name.clone(),
@@ -207,6 +222,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             items.push(Item {
                                 name,
                                 amount: item_amount.unwrap_or(0.0),
+                                forex: item_forex.clone(),
                                 rate: item_rate,
                                 discount: item_discount,
                                 actual_qty: item_actual_qty,
@@ -230,6 +246,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 godown_name: godown,
                                 batch_name: batch,
                                 amount,
+                                forex: batch_forex.clone(),
                                 actual_qty: batch_actual_qty,
                                 billed_qty: batch_billed_qty,
                             });
@@ -243,6 +260,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             accounting_allocations.push(AccountingAllocation {
                                 ledger_name: ledger,
                                 amount,
+                                forex: acct_forex.clone(),
                                 is_deemed_positive: acct_is_deemed_positive
                                     .as_ref()
                                     .map_or(false, |v| v == "Yes"),
@@ -262,27 +280,14 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         }
                     }
 
-                    QName(b"LEDGERENTRIES.LIST") => {
+                    QName(b"LEDGERENTRIES.LIST") | QName(b"ALLLEDGERENTRIES.LIST") => {
                         if let (Some(name), Some(amount)) =
                             (ledger_entry_name.clone(), ledger_entry_amount)
                         {
                             voucher_entries.push(VoucherEntry {
                                 ledger_name: name,
                                 amount: amount.abs(),
-                                is_debit: amount > 0.0,
-                                is_party_ledger: ledger_entry_is_party
-                                    .as_ref()
-                                    .map_or(false, |v| v == "Yes"),
-                            });
-                        }
-                    }
-                    QName(b"ALLLEDGERENTRIES.LIST") => {
-                        if let (Some(name), Some(amount)) =
-                            (ledger_entry_name.clone(), ledger_entry_amount)
-                        {
-                            voucher_entries.push(VoucherEntry {
-                                ledger_name: name,
-                                amount: amount.abs(),
+                                forex: ledger_entry_forex.clone().map(abs_forex),
                                 is_debit: amount > 0.0,
                                 is_party_ledger: ledger_entry_is_party
                                     .as_ref()
@@ -323,7 +328,10 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 && !in_context(b"ACCOUNTINGALLOCATIONS.LIST")
                                 && !in_ledger_entries() =>
                         {
-                            voucher_amount = parse_tally_amount(&text);
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                voucher_amount = Some(parsed.amount);
+                                voucher_amount_forex = parsed.forex;
+                            }
                         }
                         QName(b"VOUCHERTYPENAME") => {
                             voucher_type = Some(text);
@@ -388,7 +396,10 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 && !in_context(b"BATCHALLOCATIONS.LIST")
                                 && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
                         {
-                            item_amount = parse_tally_amount(&text);
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                item_amount = Some(parsed.amount);
+                                item_forex = parsed.forex;
+                            }
                         }
                         QName(b"RATE")
                             if in_context(b"ALLINVENTORYENTRIES.LIST")
@@ -432,7 +443,10 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             batch_name = Some(text);
                         }
                         QName(b"AMOUNT") if in_context(b"BATCHALLOCATIONS.LIST") => {
-                            batch_amount = parse_tally_amount(&text);
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                batch_amount = Some(parsed.amount);
+                                batch_forex = parsed.forex;
+                            }
                         }
                         QName(b"ACTUALQTY") if in_context(b"BATCHALLOCATIONS.LIST") => {
                             batch_actual_qty = text.parse().ok();
@@ -446,7 +460,10 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             acct_ledger_name = Some(text);
                         }
                         QName(b"AMOUNT") if in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
-                            acct_amount = parse_tally_amount(&text);
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                acct_amount = Some(parsed.amount);
+                                acct_forex = parsed.forex;
+                            }
                         }
                         QName(b"ISDEEMEDPOSITIVE") if in_context(b"ACCOUNTINGALLOCATIONS.LIST") => {
                             acct_is_deemed_positive = Some(text);
@@ -474,7 +491,10 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             if in_ledger_entries()
                                 && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
                         {
-                            ledger_entry_amount = parse_tally_amount(&text);
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                ledger_entry_amount = Some(parsed.amount);
+                                ledger_entry_forex = parsed.forex;
+                            }
                         }
                         QName(b"ISPARTYLEDGER") if in_ledger_entries() => {
                             ledger_entry_is_party = Some(text);
@@ -501,18 +521,108 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     vouchers
 }
 
+#[derive(Debug, Clone)]
+struct ParsedTallyAmount {
+    amount: f32,
+    forex: Option<ForexDetails>,
+}
+
 fn parse_tally_amount(text: &str) -> Option<f32> {
+    parse_tally_amount_details(text).map(|parsed| parsed.amount)
+}
+
+fn parse_tally_amount_details(text: &str) -> Option<ParsedTallyAmount> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return None;
     }
 
     if let Ok(value) = trimmed.parse::<f32>() {
-        return Some(value);
+        return Some(ParsedTallyAmount {
+            amount: value,
+            forex: None,
+        });
     }
 
-    let segment = trimmed.rsplit('=').next().unwrap_or(trimmed).trim();
-    let negative = segment.contains('-') || (!trimmed.contains('=') && trimmed.starts_with('-'));
+    if let Some((left, rest)) = trimmed.split_once('@') {
+        if let Some((rate_part, right)) = rest.split_once('=') {
+            let (foreign_amount, foreign_currency_hint) = parse_currency_amount(left.trim())?;
+            let (base_amount, base_currency_hint) = parse_currency_amount(right.trim())?;
+            let (exchange_rate, rate_base, rate_foreign) = parse_exchange_rate(rate_part.trim())?;
+
+            let foreign_currency = first_non_empty([rate_foreign, foreign_currency_hint])?;
+            let base_currency = first_non_empty([rate_base, base_currency_hint])?;
+
+            return Some(ParsedTallyAmount {
+                amount: base_amount,
+                forex: Some(ForexDetails {
+                    foreign_amount,
+                    foreign_currency,
+                    base_currency,
+                    exchange_rate,
+                }),
+            });
+        }
+    }
+
+    let amount = parse_plain_signed_amount(trimmed)?;
+    Some(ParsedTallyAmount {
+        amount,
+        forex: None,
+    })
+}
+
+fn parse_currency_amount(text: &str) -> Option<(f32, Option<String>)> {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"(?x)^\s*(-)?\s*([^\d.\-]*?)\s*([\d.]+)\s*([^\d.\-]*?)\s*$")
+            .expect("currency amount regex")
+    });
+
+    let caps = re.captures(text)?;
+    let negative = caps.get(1).is_some();
+    let prefix = caps.get(2).map(|m| m.as_str().trim()).unwrap_or("");
+    let number = caps.get(3)?.as_str();
+    let suffix = caps.get(4).map(|m| m.as_str().trim()).unwrap_or("");
+
+    let mut value = number.parse::<f32>().ok()?;
+    if negative {
+        value = -value;
+    }
+
+    let currency = if !prefix.is_empty() {
+        Some(prefix.to_string())
+    } else if !suffix.is_empty() {
+        Some(suffix.to_string())
+    } else {
+        None
+    };
+
+    Some((value, currency))
+}
+
+fn parse_exchange_rate(text: &str) -> Option<(f32, Option<String>, Option<String>)> {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"(?x)^\s*([^\d./]+?)\s*([\d.]+)\s*/\s*(.+?)\s*$")
+            .expect("exchange rate regex")
+    });
+
+    let caps = re.captures(text)?;
+    let base_currency = caps.get(1).map(|m| m.as_str().trim().to_string());
+    let rate = caps.get(2)?.as_str().parse::<f32>().ok()?;
+    let foreign_currency = caps.get(3).map(|m| m.as_str().trim().to_string());
+
+    Some((
+        rate,
+        base_currency.filter(|value| !value.is_empty()),
+        foreign_currency.filter(|value| !value.is_empty()),
+    ))
+}
+
+fn parse_plain_signed_amount(text: &str) -> Option<f32> {
+    let segment = text.rsplit('=').next().unwrap_or(text).trim();
+    let negative = segment.contains('-') || (!text.contains('=') && text.starts_with('-'));
     let numeric: String = segment
         .chars()
         .filter(|ch| ch.is_ascii_digit() || *ch == '.')
@@ -526,9 +636,18 @@ fn parse_tally_amount(text: &str) -> Option<f32> {
     Some(if negative { -value } else { value })
 }
 
+fn first_non_empty<const N: usize>(values: [Option<String>; N]) -> Option<String> {
+    values.into_iter().flatten().find(|value| !value.is_empty())
+}
+
+fn abs_forex(mut forex: ForexDetails) -> ForexDetails {
+    forex.foreign_amount = forex.foreign_amount.abs();
+    forex
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_tally_amount, parse_vouchers_from_xml};
+    use super::{parse_tally_amount, parse_tally_amount_details, parse_vouchers_from_xml};
 
     #[test]
     fn parses_voucher_amount_and_allledgerentries() {
@@ -566,15 +685,74 @@ mod tests {
 
         let voucher = &vouchers[0];
         assert_eq!(voucher.amount, Some(-250000.0));
+        assert!(voucher.amount_forex.is_none());
         assert_eq!(voucher.entries.len(), 2);
         assert_eq!(voucher.entries[0].ledger_name, "ICICI 2325");
         assert!(voucher.entries[0].is_party_ledger);
         assert_eq!(voucher.entries[0].amount, 250000.0);
+        assert!(voucher.entries[0].forex.is_none());
     }
 
     #[test]
     fn parses_multicurrency_amount_using_base_amount() {
         let amount = parse_tally_amount("-$5000.00 @ ? 84.8565/$ = -? 424282.50");
         assert_eq!(amount, Some(-424282.5));
+    }
+
+    #[test]
+    fn parses_multicurrency_amount_details() {
+        let parsed = parse_tally_amount_details("EUR29.37 @ D$1.1675/EUR = D$34.29")
+            .expect("parsed forex amount");
+        assert_eq!(parsed.amount, 34.29);
+        let forex = parsed.forex.expect("forex details");
+        assert_eq!(forex.foreign_amount, 29.37);
+        assert_eq!(forex.foreign_currency, "EUR");
+        assert_eq!(forex.base_currency, "D$");
+        assert!((forex.exchange_rate - 1.1675).abs() < 0.00001);
+    }
+
+    #[test]
+    fn parses_multicurrency_ledger_entries_on_voucher() {
+        let xml = r#"
+<ENVELOPE>
+  <VOUCHER>
+    <GUID>fx-1</GUID>
+    <DATE>20251206</DATE>
+    <VOUCHERTYPENAME>Journal</VOUCHERTYPENAME>
+    <VOUCHERNUMBER>48</VOUCHERNUMBER>
+    <PARTYLEDGERNAME>Wise Euro Account</PARTYLEDGERNAME>
+    <AMOUNT>-EUR29.37 @ D$1.1675/EUR = -D$34.29</AMOUNT>
+    <ALLLEDGERENTRIES.LIST>
+      <LEDGERNAME>Wise Euro Account</LEDGERNAME>
+      <ISPARTYLEDGER>Yes</ISPARTYLEDGER>
+      <AMOUNT>-EUR29.37 @ D$1.1675/EUR = -D$34.29</AMOUNT>
+    </ALLLEDGERENTRIES.LIST>
+    <ALLLEDGERENTRIES.LIST>
+      <LEDGERNAME>Banking Fees &amp; Charges</LEDGERNAME>
+      <ISPARTYLEDGER>No</ISPARTYLEDGER>
+      <AMOUNT>EUR29.37 @ D$1.1675/EUR = D$34.29</AMOUNT>
+    </ALLLEDGERENTRIES.LIST>
+  </VOUCHER>
+</ENVELOPE>
+"#;
+
+        let vouchers = parse_vouchers_from_xml(xml);
+        assert_eq!(vouchers.len(), 1);
+        let voucher = &vouchers[0];
+        assert_eq!(voucher.amount, Some(-34.29));
+        let amount_forex = voucher.amount_forex.as_ref().expect("voucher forex");
+        assert_eq!(amount_forex.foreign_amount, -29.37);
+        assert_eq!(amount_forex.foreign_currency, "EUR");
+        assert_eq!(amount_forex.base_currency, "D$");
+        assert!((amount_forex.exchange_rate - 1.1675).abs() < 0.00001);
+
+        assert_eq!(voucher.entries.len(), 2);
+        let party = &voucher.entries[0];
+        assert!(party.is_party_ledger);
+        assert_eq!(party.amount, 34.29);
+        let party_forex = party.forex.as_ref().expect("party forex");
+        assert_eq!(party_forex.foreign_amount, 29.37);
+        assert_eq!(party_forex.foreign_currency, "EUR");
+        assert_eq!(party_forex.base_currency, "D$");
     }
 }

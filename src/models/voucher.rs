@@ -8,11 +8,26 @@ pub struct GstRateDetail {
     pub valuation_type: Option<String>,
 }
 
+/// Multicurrency details embedded in Tally `AMOUNT` values such as
+/// `EUR29.37 @ D$1.1675/EUR = D$34.29`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForexDetails {
+    /// Amount in the foreign/transaction currency.
+    pub foreign_amount: f32,
+    /// Foreign/transaction currency symbol, e.g. `EUR`.
+    pub foreign_currency: String,
+    /// Company/base currency symbol, e.g. `D$`.
+    pub base_currency: String,
+    /// Exchange rate as base-currency units per 1 foreign unit.
+    pub exchange_rate: f32,
+}
+
 #[derive(Debug, Clone)]
 pub struct BatchAllocation {
     pub godown_name: String,
     pub batch_name: String,
     pub amount: f32,
+    pub forex: Option<ForexDetails>,
     pub actual_qty: Option<f32>,
     pub billed_qty: Option<f32>,
 }
@@ -21,6 +36,7 @@ pub struct BatchAllocation {
 pub struct AccountingAllocation {
     pub ledger_name: String,
     pub amount: f32,
+    pub forex: Option<ForexDetails>,
     pub is_deemed_positive: bool,
 }
 
@@ -28,6 +44,7 @@ pub struct AccountingAllocation {
 pub struct VoucherEntry {
     pub ledger_name: String,
     pub amount: f32,
+    pub forex: Option<ForexDetails>,
     pub is_debit: bool,
     pub is_party_ledger: bool,
 }
@@ -59,6 +76,7 @@ impl VoucherEntry {
 pub struct Item {
     pub name: String,
     pub amount: f32,
+    pub forex: Option<ForexDetails>,
     pub rate: Option<f32>,
     pub discount: Option<f32>,
     pub actual_qty: Option<f32>,
@@ -81,6 +99,7 @@ pub struct Voucher {
     pub action: Option<String>,
     pub date_yyyymmdd: String,
     pub amount: Option<f32>,
+    pub amount_forex: Option<ForexDetails>,
     pub voucher_number: Option<String>,
     pub reference: Option<String>,
     pub party_ledger_name: Option<String>,
@@ -167,19 +186,43 @@ impl fmt::Display for GstRateDetail {
     }
 }
 
+impl fmt::Display for ForexDetails {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:.4} {} @ {}{:.6}/{} = {:.4} {}",
+            self.foreign_amount,
+            self.foreign_currency,
+            self.base_currency,
+            self.exchange_rate,
+            self.foreign_currency,
+            self.foreign_amount * self.exchange_rate,
+            self.base_currency
+        )
+    }
+}
+
 impl fmt::Display for BatchAllocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} @ {}: {}",
             self.batch_name, self.godown_name, self.amount
-        )
+        )?;
+        if let Some(forex) = &self.forex {
+            write!(f, " ({})", forex)?;
+        }
+        Ok(())
     }
 }
 
 impl fmt::Display for AccountingAllocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} = {}", self.ledger_name, self.amount)
+        write!(f, "{} = {}", self.ledger_name, self.amount)?;
+        if let Some(forex) = &self.forex {
+            write!(f, " ({})", forex)?;
+        }
+        Ok(())
     }
 }
 
@@ -189,6 +232,9 @@ impl fmt::Display for VoucherEntry {
         write!(f, "{}: {} ({})", self.ledger_name, self.amount, side)?;
         if self.is_party_ledger {
             write!(f, " [Party]")?;
+        }
+        if let Some(forex) = &self.forex {
+            write!(f, " | {}", forex)?;
         }
         Ok(())
     }
@@ -256,6 +302,9 @@ impl fmt::Display for Voucher {
         writeln!(f, "Date: {}", self.date_yyyymmdd)?;
         if let Some(amount) = self.amount {
             writeln!(f, "Amount: {}", amount)?;
+        }
+        if let Some(forex) = &self.amount_forex {
+            writeln!(f, "Amount Forex: {}", forex)?;
         }
 
         if let Some(vn) = &self.voucher_number {
