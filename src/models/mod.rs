@@ -1,4 +1,5 @@
 mod collection;
+mod company;
 mod group;
 mod helpers;
 mod import;
@@ -11,6 +12,7 @@ mod unit;
 mod voucher;
 
 pub use collection::{CurrencySummary, GroupSummary, LedgerSummary, StockItemSummary};
+pub use company::CompanyDetails;
 pub use group::Group;
 pub use import::ImportResult;
 pub use item_invoice::ItemInvoice;

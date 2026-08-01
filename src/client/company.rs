@@ -1,5 +1,7 @@
+use super::extract::extract_companies_from_xml;
 use super::TallyClient;
 use crate::errors::{Result, TallyError};
+use crate::models::CompanyDetails;
 use crate::xml_builder::XmlBuilder;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
@@ -8,6 +10,26 @@ use quick_xml::Reader;
 impl TallyClient {
     pub fn active_company_name(&self) -> Result<Option<String>> {
         self.current_company_name()
+    }
+
+    /// Fetch detailed company master data for all companies currently available in Tally.
+    pub fn get_companies(&self) -> Result<Vec<CompanyDetails>> {
+        let current_company = self.current_company_name()?;
+        let xml = XmlBuilder::create_company_export_request(current_company.as_deref())?;
+        let resp = self.post_xml(&xml)?;
+        Ok(extract_companies_from_xml(&resp))
+    }
+
+    /// Fetch detailed master data for the active/configured company.
+    pub fn get_company_details(&self) -> Result<Option<CompanyDetails>> {
+        let active = self.current_company_name()?;
+        let companies = self.get_companies()?;
+        if let Some(active_name) = active {
+            return Ok(companies
+                .into_iter()
+                .find(|company| company.name.eq_ignore_ascii_case(&active_name)));
+        }
+        Ok(companies.into_iter().next())
     }
 
     pub(crate) fn prepare_request_xml(&self, xml: &str) -> Result<String> {

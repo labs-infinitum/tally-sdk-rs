@@ -6,6 +6,7 @@ fn main() {
     println!("  cargo run --example fetch_all_accounts");
     println!("  cargo run --example fetch_all_groups");
     println!("  cargo run --example fetch_all_currencies");
+    println!("  cargo run --example fetch_company_details");
     println!("  cargo run --example fetch_trial_balance -- --fy 2025-2026");
     println!("  cargo run --example fetch_balance_sheet -- --fy 2025-2026");
     println!("  cargo run --example fetch_profit_and_loss -- --fy 2025-2026");

@@ -15,6 +15,16 @@ fn main() {
     println!("Currencies in company: {company}");
     println!("Found {} currency/currencies", currencies.len());
     for currency in currencies {
-        println!("{}", currency.name);
+        println!(
+            "{} | original {} | mailing {} | expanded {} | decimals {}",
+            currency.name,
+            currency.original_name.as_deref().unwrap_or("-"),
+            currency.mailing_name.as_deref().unwrap_or("-"),
+            currency.expanded_symbol.as_deref().unwrap_or("-"),
+            currency
+                .decimal_places
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "-".into())
+        );
     }
 }
