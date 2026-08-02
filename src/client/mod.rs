@@ -23,9 +23,10 @@ pub struct TallyClient {
 impl TallyClient {
     pub fn new(cfg: TallyConfig) -> Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
+        // UTF-16 is required for currency/special symbols such as ₹.
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            reqwest::header::HeaderValue::from_static("text/xml"),
+            reqwest::header::HeaderValue::from_static("text/xml;charset=utf-16"),
         );
         headers.insert(
             reqwest::header::CACHE_CONTROL,

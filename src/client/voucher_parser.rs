@@ -527,6 +527,7 @@ struct ParsedTallyAmount {
     forex: Option<ForexDetails>,
 }
 
+#[cfg(test)]
 fn parse_tally_amount(text: &str) -> Option<f32> {
     parse_tally_amount_details(text).map(|parsed| parsed.amount)
 }
