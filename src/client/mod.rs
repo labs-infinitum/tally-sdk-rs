@@ -60,26 +60,8 @@ impl TallyClient {
     }
 
     pub fn test_connection(&self) -> Result<bool> {
-        let header = serde_json::json!({
-            "VERSION": "1",
-            "TALLYREQUEST": "EXPORT",
-            "TYPE": "COLLECTION",
-            "ID": "Company",
-        })
-        .as_object()
-        .unwrap()
-        .clone();
-        let mut body = serde_json::Map::new();
-        let mut desc = serde_json::Map::new();
-        let mut stat = serde_json::Map::new();
-        stat.insert(
-            "SVEXPORTFORMAT".into(),
-            serde_json::Value::String("$$SysName:XML".into()),
-        );
-        desc.insert("STATICVARIABLES".into(), serde_json::Value::Object(stat));
-        body.insert("DESC".into(), serde_json::Value::Object(desc));
-        let xml = XmlBuilder::create_envelope(&header, Some(&body))?;
-        let _resp = self.post_xml(&xml)?;
+        let xml = XmlBuilder::create_company_list_export_request()?;
+        let _resp = self.post_raw_xml(&xml)?;
         Ok(true)
     }
 }

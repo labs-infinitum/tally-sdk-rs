@@ -372,6 +372,42 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Export loaded companies via an explicit TDL collection.
+    ///
+    /// Avoid `TYPE=Data ID=Company` / bare `ID=Company` — those can make Tally open
+    /// `Form:Company` and raise `No 'PARTS'!`.
+    pub fn create_company_list_export_request() -> Result<String> {
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_export_envelope_header(
+            &mut writer,
+            "EXPORT",
+            "COLLECTION",
+            "SDKListOfCompanies",
+        )?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "COLLECTION",
+            &[("NAME", "SDKListOfCompanies"), ("ISMODIFY", "No")],
+        )?;
+        XmlBuilder::write_text_node(&mut writer, "TYPE", "Company")?;
+        XmlBuilder::write_text_node(&mut writer, "FETCH", "Name")?;
+        XmlBuilder::write_end_tag(&mut writer, "COLLECTION")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
+
+        XmlBuilder::finish_writer(writer)
+    }
+
     pub fn create_builtin_report_request(
         report_name: &str,
         from_date: Option<&str>,

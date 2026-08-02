@@ -11,6 +11,13 @@ impl XmlBuilder {
     where
         F: FnOnce(&mut Writer<Cursor<Vec<u8>>>) -> Result<()>,
     {
+        XmlBuilder::create_import_data_request("All Masters", build)
+    }
+
+    pub(crate) fn create_import_data_request<F>(report_name: &str, build: F) -> Result<String>
+    where
+        F: FnOnce(&mut Writer<Cursor<Vec<u8>>>) -> Result<()>,
+    {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_start_tag(&mut writer, "ENVELOPE")?;
         XmlBuilder::write_start_tag(&mut writer, "HEADER")?;
@@ -19,7 +26,7 @@ impl XmlBuilder {
         XmlBuilder::write_start_tag(&mut writer, "BODY")?;
         XmlBuilder::write_start_tag(&mut writer, "IMPORTDATA")?;
         XmlBuilder::write_start_tag(&mut writer, "REQUESTDESC")?;
-        XmlBuilder::write_text_node(&mut writer, "REPORTNAME", "All Masters")?;
+        XmlBuilder::write_text_node(&mut writer, "REPORTNAME", report_name)?;
         XmlBuilder::write_end_tag(&mut writer, "REQUESTDESC")?;
         XmlBuilder::write_start_tag(&mut writer, "REQUESTDATA")?;
         XmlBuilder::write_start_tag_with_attrs(
