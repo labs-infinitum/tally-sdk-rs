@@ -1,6 +1,6 @@
 use super::{voucher_parser, TallyClient};
 use crate::errors::Result;
-use crate::models::Voucher;
+use crate::models::{CurrencySummary, ForexDetails, Voucher};
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
@@ -23,7 +23,13 @@ impl TallyClient {
             current_company.as_deref(),
         )?;
         let resp = self.post_xml(&xml)?;
-        Ok(voucher_parser::parse_vouchers_from_xml(&resp))
+        let mut vouchers = voucher_parser::parse_vouchers_from_xml(&resp);
+        if vouchers_have_forex(&vouchers) {
+            if let Ok(currencies) = self.get_currencies() {
+                enrich_vouchers_with_currency_names(&mut vouchers, &currencies);
+            }
+        }
+        Ok(vouchers)
     }
 
     /// Fetch vouchers and enforce the date window client-side.
@@ -45,4 +51,126 @@ fn is_yyyymmdd_in_range(date: &str, from_date: &str, to_date: &str) -> bool {
         return false;
     }
     date >= from_date && date <= to_date
+}
+
+fn vouchers_have_forex(vouchers: &[Voucher]) -> bool {
+    vouchers.iter().any(|voucher| {
+        voucher.amount_forex.is_some()
+            || voucher.entries.iter().any(|entry| entry.forex.is_some())
+            || voucher.items.iter().any(|item| {
+                item.forex.is_some()
+                    || item
+                        .batch_allocations
+                        .iter()
+                        .any(|batch| batch.forex.is_some())
+                    || item
+                        .accounting_allocations
+                        .iter()
+                        .any(|allocation| allocation.forex.is_some())
+            })
+    })
+}
+
+fn enrich_vouchers_with_currency_names(vouchers: &mut [Voucher], currencies: &[CurrencySummary]) {
+    for voucher in vouchers {
+        if let Some(forex) = voucher.amount_forex.as_mut() {
+            resolve_forex_names(forex, currencies);
+        }
+        for entry in &mut voucher.entries {
+            if let Some(forex) = entry.forex.as_mut() {
+                resolve_forex_names(forex, currencies);
+            }
+        }
+        for item in &mut voucher.items {
+            if let Some(forex) = item.forex.as_mut() {
+                resolve_forex_names(forex, currencies);
+            }
+            for batch in &mut item.batch_allocations {
+                if let Some(forex) = batch.forex.as_mut() {
+                    resolve_forex_names(forex, currencies);
+                }
+            }
+            for allocation in &mut item.accounting_allocations {
+                if let Some(forex) = allocation.forex.as_mut() {
+                    resolve_forex_names(forex, currencies);
+                }
+            }
+        }
+    }
+}
+
+fn resolve_forex_names(forex: &mut ForexDetails, currencies: &[CurrencySummary]) {
+    forex.foreign_currency_name = currency_name_for_symbol(&forex.foreign_currency, currencies);
+    forex.base_currency_name = currency_name_for_symbol(&forex.base_currency, currencies);
+}
+
+fn currency_name_for_symbol(symbol: &str, currencies: &[CurrencySummary]) -> Option<String> {
+    currencies
+        .iter()
+        .find(|currency| currency.matches_symbol(symbol))
+        .map(|currency| currency.display_name().to_string())
+        .filter(|name| !name.is_empty() && !name.eq_ignore_ascii_case(symbol))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{currency_name_for_symbol, resolve_forex_names};
+    use crate::models::{CurrencySummary, ForexDetails};
+
+    #[test]
+    fn resolves_currency_names_from_symbols() {
+        let currencies = vec![
+            CurrencySummary {
+                name: "D$".into(),
+                original_name: Some("$".into()),
+                mailing_name: Some("Dollar".into()),
+                expanded_symbol: Some("Dollar".into()),
+                decimal_symbol: Some("Cent".into()),
+                decimal_places: Some(2),
+                decimal_places_for_printing: Some(2),
+                is_suffix: Some(false),
+                has_space: Some(false),
+                in_millions: Some(false),
+                guid: None,
+            },
+            CurrencySummary {
+                name: "EUR".into(),
+                original_name: Some("EUR".into()),
+                mailing_name: Some("EURO".into()),
+                expanded_symbol: Some("EURO".into()),
+                decimal_symbol: None,
+                decimal_places: Some(2),
+                decimal_places_for_printing: Some(2),
+                is_suffix: Some(false),
+                has_space: Some(false),
+                in_millions: Some(false),
+                guid: None,
+            },
+        ];
+
+        assert_eq!(
+            currency_name_for_symbol("EUR", &currencies).as_deref(),
+            Some("EURO")
+        );
+        assert_eq!(
+            currency_name_for_symbol("D$", &currencies).as_deref(),
+            Some("Dollar")
+        );
+        assert_eq!(
+            currency_name_for_symbol("$", &currencies).as_deref(),
+            Some("Dollar")
+        );
+
+        let mut forex = ForexDetails {
+            foreign_amount: 29.37,
+            foreign_currency: "EUR".into(),
+            foreign_currency_name: None,
+            base_currency: "D$".into(),
+            base_currency_name: None,
+            exchange_rate: 1.1675,
+        };
+        resolve_forex_names(&mut forex, &currencies);
+        assert_eq!(forex.foreign_currency_label(), "EURO");
+        assert_eq!(forex.base_currency_label(), "Dollar");
+    }
 }

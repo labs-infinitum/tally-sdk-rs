@@ -16,10 +16,30 @@ pub struct ForexDetails {
     pub foreign_amount: f32,
     /// Foreign/transaction currency symbol, e.g. `EUR`.
     pub foreign_currency: String,
+    /// Resolved foreign currency name when available, e.g. `EURO`.
+    pub foreign_currency_name: Option<String>,
     /// Company/base currency symbol, e.g. `D$`.
     pub base_currency: String,
+    /// Resolved base currency name when available, e.g. `Dollar`.
+    pub base_currency_name: Option<String>,
     /// Exchange rate as base-currency units per 1 foreign unit.
     pub exchange_rate: f32,
+}
+
+impl ForexDetails {
+    /// Prefer the resolved currency name, otherwise the symbol.
+    pub fn foreign_currency_label(&self) -> &str {
+        self.foreign_currency_name
+            .as_deref()
+            .unwrap_or(self.foreign_currency.as_str())
+    }
+
+    /// Prefer the resolved currency name, otherwise the symbol.
+    pub fn base_currency_label(&self) -> &str {
+        self.base_currency_name
+            .as_deref()
+            .unwrap_or(self.base_currency.as_str())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -190,14 +210,14 @@ impl fmt::Display for ForexDetails {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:.4} {} @ {}{:.6}/{} = {:.4} {}",
+            "{:.4} {} @ {} {:.6}/{} = {:.4} {}",
             self.foreign_amount,
-            self.foreign_currency,
-            self.base_currency,
+            self.foreign_currency_label(),
+            self.base_currency_label(),
             self.exchange_rate,
-            self.foreign_currency,
-            self.foreign_amount * self.exchange_rate,
-            self.base_currency
+            self.foreign_currency_label(),
+            self.foreign_amount.abs() * self.exchange_rate,
+            self.base_currency_label()
         )
     }
 }

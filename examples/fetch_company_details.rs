@@ -20,10 +20,18 @@ fn main() {
         "Formal name: {}",
         company.formal_name.as_deref().unwrap_or("-")
     );
-    println!(
-        "Base currency: {}",
-        company.currency_name.as_deref().unwrap_or("-")
-    );
+    let base_currency = company.currency_name.as_deref().unwrap_or("-");
+    let base_currency_name = client
+        .get_currencies()
+        .ok()
+        .and_then(|currencies| {
+            currencies
+                .into_iter()
+                .find(|currency| currency.matches_symbol(base_currency))
+                .map(|currency| currency.display_name().to_string())
+        })
+        .unwrap_or_else(|| base_currency.to_string());
+    println!("Base currency: {base_currency_name} ({base_currency})");
     println!(
         "Books from: {}",
         company.books_from.as_deref().unwrap_or("-")

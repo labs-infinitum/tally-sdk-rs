@@ -16,11 +16,10 @@ fn main() {
     println!("Found {} currency/currencies", currencies.len());
     for currency in currencies {
         println!(
-            "{} | original {} | mailing {} | expanded {} | decimals {}",
+            "{} | name {} | original {} | decimals {}",
             currency.name,
+            currency.display_name(),
             currency.original_name.as_deref().unwrap_or("-"),
-            currency.mailing_name.as_deref().unwrap_or("-"),
-            currency.expanded_symbol.as_deref().unwrap_or("-"),
             currency
                 .decimal_places
                 .map(|value| value.to_string())

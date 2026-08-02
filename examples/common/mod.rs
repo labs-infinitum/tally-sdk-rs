@@ -104,10 +104,10 @@ pub fn summarize_voucher(voucher: &Voucher) -> String {
     );
     if let Some(forex) = forex {
         summary.push_str(&format!(
-            " | fx {:.4} {} @ {}{:.6}",
+            " | fx {:.4} {} @ {} {:.6}",
             forex.foreign_amount.abs(),
-            forex.foreign_currency,
-            forex.base_currency,
+            forex.foreign_currency_label(),
+            forex.base_currency_label(),
             forex.exchange_rate
         ));
     }
@@ -127,10 +127,10 @@ pub fn summarize_entry(entry: &VoucherEntry) -> String {
     );
     if let Some(forex) = &entry.forex {
         summary.push_str(&format!(
-            " | fx {:.4} {} @ {}{:.6}",
+            " | fx {:.4} {} @ {} {:.6}",
             forex.foreign_amount,
-            forex.foreign_currency,
-            forex.base_currency,
+            forex.foreign_currency_label(),
+            forex.base_currency_label(),
             forex.exchange_rate
         ));
     }

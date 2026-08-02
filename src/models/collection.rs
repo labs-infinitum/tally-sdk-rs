@@ -35,3 +35,21 @@ pub struct CurrencySummary {
     pub in_millions: Option<bool>,
     pub guid: Option<String>,
 }
+
+impl CurrencySummary {
+    /// Prefer mailing/expanded name, otherwise the Tally symbol.
+    pub fn display_name(&self) -> &str {
+        self.mailing_name
+            .as_deref()
+            .or(self.expanded_symbol.as_deref())
+            .unwrap_or(self.name.as_str())
+    }
+
+    pub fn matches_symbol(&self, symbol: &str) -> bool {
+        self.name.eq_ignore_ascii_case(symbol)
+            || self
+                .original_name
+                .as_deref()
+                .is_some_and(|original| original.eq_ignore_ascii_case(symbol))
+    }
+}

@@ -558,7 +558,9 @@ fn parse_tally_amount_details(text: &str) -> Option<ParsedTallyAmount> {
                 forex: Some(ForexDetails {
                     foreign_amount,
                     foreign_currency,
+                    foreign_currency_name: None,
                     base_currency,
+                    base_currency_name: None,
                     exchange_rate,
                 }),
             });
