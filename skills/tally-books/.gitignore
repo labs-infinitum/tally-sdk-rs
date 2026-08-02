@@ -1,0 +1,3 @@
+# Skill CLI build artifacts + install state
+scripts/target/
+.sdk-root

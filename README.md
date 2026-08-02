@@ -218,6 +218,8 @@ The crate includes runnable examples under [`examples/`](examples):
 - [`fetch_trial_balance.rs`](examples/fetch_trial_balance.rs)
 - [`fetch_balance_sheet.rs`](examples/fetch_balance_sheet.rs)
 - [`fetch_profit_and_loss.rs`](examples/fetch_profit_and_loss.rs)
+- [`create_ledger.rs`](examples/create_ledger.rs)
+- [`create_ledger_entry.rs`](examples/create_ledger_entry.rs)
 
 Run them with:
 
@@ -233,6 +235,9 @@ cargo run --example fetch_day_book -- --from 20250401 --to 20250731 --verbose
 cargo run --example fetch_trial_balance -- --fy 2025-2026
 cargo run --example fetch_balance_sheet -- --fy 2025-2026
 cargo run --example fetch_profit_and_loss -- --fy 2025-2026
+cargo run --example create_ledger
+cargo run --example create_ledger -- --name "Acme Traders" --parent "Sundry Debtors"
+cargo run --example create_ledger_entry -- --party "Acme Traders" --amount 1000 --date 20260701
 ```
 
 Supported example flags:
@@ -242,6 +247,8 @@ Supported example flags:
 - `--to YYYYMMDD`
 - `--verbose` for day book voucher ledger-line output
 - `--flat` for report exports without `EXPLODEFLAG`
+- `--name`, `--parent`, `--opening-balance`, and `--debug` for ledger creation
+- `--party`, `--account`, `--amount`, `--date`, `--bill-ref`, `--voucher-number`, `--voucher-type`, `--narration`, and `--debug` for ledger entries
 
 Environment variables used by the examples:
 

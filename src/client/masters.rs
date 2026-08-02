@@ -101,6 +101,12 @@ impl TallyClient {
             "FETCHLIST".into(),
             serde_json::json!({ "FETCH": ["NAME", "PARENT"] }),
         );
+        if let Some(company) = self.current_company_name()? {
+            stat.insert(
+                "SVCURRENTCOMPANY".into(),
+                serde_json::Value::String(company),
+            );
+        }
         let xml = XmlBuilder::create_export_request("COLLECTION", collection_type, Some(&stat))?;
         let resp = self.post_xml(&xml)?;
         Ok(extractor(&resp))
