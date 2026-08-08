@@ -117,17 +117,82 @@ jobs:
       - name: Commit, tag, and push
         if: inputs.dry_run != 'true'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.bump.outputs.tag }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add Cargo.toml Cargo.lock
-          git commit -m "Release ${TAG}"
-          git tag -a "$TAG" -m "Release ${TAG}"
-          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
-          git push origin "$TAG"
+          # Branch protection requires verified signatures. Commits created via the
+          # GitHub Git Data API are signed by GitHub and satisfy that rule.
+          REPO="${GITHUB_REPOSITORY}"
+          MESSAGE="Release ${TAG}"
+
+          make_blob() {
+            local file="$1"
+            jq -n --rawfile content "$file" '{content: $content, encoding: "utf-8"}' \
+              | gh api "repos/${REPO}/git/blobs" --input - --jq .sha
+          }
+
+          parent_sha="$(gh api "repos/${REPO}/git/ref/heads/${BRANCH}" --jq .object.sha)"
+          base_tree_sha="$(gh api "repos/${REPO}/git/commits/${parent_sha}" --jq .tree.sha)"
+
+          toml_sha="$(make_blob Cargo.toml)"
+          lock_sha="$(make_blob Cargo.lock)"
+
+          tree_sha="$(
+            jq -n \
+              --arg base "$base_tree_sha" \
+              --arg toml "$toml_sha" \
+              --arg lock "$lock_sha" \
+              '{
+                base_tree: $base,
+                tree: [
+                  {path: "Cargo.toml", mode: "100644", type: "blob", sha: $toml},
+                  {path: "Cargo.lock", mode: "100644", type: "blob", sha: $lock}
+                ]
+              }' \
+              | gh api "repos/${REPO}/git/trees" --input - --jq .sha
+          )"
+
+          commit_sha="$(
+            jq -n \
+              --arg message "$MESSAGE" \
+              --arg tree "$tree_sha" \
+              --arg parent "$parent_sha" \
+              '{message: $message, tree: $tree, parents: [$parent]}' \
+              | gh api "repos/${REPO}/git/commits" --input - --jq .sha
+          )"
+
+          jq -n --arg sha "$commit_sha" '{sha: $sha}' \
+            | gh api "repos/${REPO}/git/refs/heads/${BRANCH}" -X PATCH --input - >/dev/null
+
+          tag_object_sha="$(
+            jq -n \
+              --arg tag "$TAG" \
+              --arg message "$MESSAGE" \
+              --arg object "$commit_sha" \
+              --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                tag: $tag,
+                message: $message,
+                object: $object,
+                type: "commit",
+                tagger: {
+                  name: "github-actions[bot]",
+                  email: "41898282+github-actions[bot]@users.noreply.github.com",
+                  date: $date
+                }
+              }' \
+              | gh api "repos/${REPO}/git/tags" --input - --jq .sha
+          )"
+
+          gh api "repos/${REPO}/git/refs" \
+            -f ref="refs/tags/${TAG}" \
+            -f sha="$tag_object_sha" >/dev/null
+
+          echo "Created verified commit ${commit_sha}"
+          echo "Created tag ${TAG} -> ${tag_object_sha}"
 
       - name: Trigger Release workflow
         if: inputs.dry_run != 'true'
@@ -142,6 +207,7 @@ jobs:
           echo "Dispatched Release workflow for $TAG"
 
       - name: Summary
+        if: always()
         run: |
           {
             echo "## Create Release"
@@ -153,7 +219,7 @@ jobs:
             echo "| Next | \`${{ steps.bump.outputs.new_version }}\` |"
             echo "| Tag | \`${{ steps.bump.outputs.tag }}\` |"
             echo "| Dry run | \`${{ inputs.dry_run }}\` |"
-            if [ "${{ inputs.dry_run }}" != "true" ]; then
+            if [ "${{ inputs.dry_run }}" != "true" ] && [ "${{ job.status }}" = "success" ]; then
               echo ""
               echo "The **Release** workflow was dispatched to publish \`${{ steps.bump.outputs.tag }}\` to crates.io."
             fi
