@@ -1,6 +1,8 @@
-use super::{report_parser, TallyClient};
+use super::{gst_parser, report_parser, TallyClient};
 use crate::errors::Result;
-use crate::models::{BalanceSheetEntry, ProfitAndLossEntry, TrialBalanceEntry};
+use crate::models::{
+    BalanceSheetEntry, GstComputationReport, Gstr1Report, ProfitAndLossEntry, TrialBalanceEntry,
+};
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
@@ -33,6 +35,29 @@ impl TallyClient {
         let resp =
             self.export_builtin_report("Profit and Loss", from_date, to_date, explode_flag)?;
         Ok(report_parser::parse_profit_and_loss_from_xml(&resp))
+    }
+
+    /// Export Tally's builtin **GST Computation** report for a period.
+    pub fn get_gst_computation(
+        &self,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+    ) -> Result<GstComputationReport> {
+        let resp = self.export_builtin_report("GST Computation", from_date, to_date, false)?;
+        Ok(gst_parser::parse_gst_computation_from_xml(&resp))
+    }
+
+    /// Build a GSTR-1 style return summary for `[from_date, to_date]`.
+    ///
+    /// TallyPrime does not currently expose a builtin HTTP report named `GSTR-1`
+    /// (export returns "Could not find Report"). This method therefore derives
+    /// B2B / B2CL / B2CS / CDNR / HSN / document sections from vouchers in the
+    /// range via [`Self::get_vouchers_in_range`].
+    pub fn get_gstr1(&self, from_date: &str, to_date: &str) -> Result<Gstr1Report> {
+        let vouchers = self.get_vouchers_in_range(from_date, to_date)?;
+        Ok(gst_parser::build_gstr1_from_vouchers(
+            from_date, to_date, &vouchers,
+        ))
     }
 
     fn export_builtin_report(

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 mod company;
 mod extract;
+mod gst_parser;
 mod http;
 mod masters;
 pub mod parse;
