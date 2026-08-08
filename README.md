@@ -40,18 +40,11 @@ Add the crate from crates.io:
 tallyprime-sdk = "0.1"
 ```
 
-If you are using this crate from another local workspace:
-
-```toml
-[dependencies]
-tallyprime-sdk = { path = "../tally-sdk-rs" }
-```
-
 If you want to reference it from Git:
 
 ```toml
 [dependencies]
-tallyprime-sdk = { git = "https://github.com/labs-infinitum/tally-sdk-rs" }
+tallyprime-sdk = { git = "https://github.com/labs-infinitum/tallyprime-sdk" }
 ```
 
 ## Quick Start
@@ -231,8 +224,8 @@ The crate includes runnable examples under [`examples/`](examples):
 Run them with:
 
 ```bash
-git clone https://github.com/labs-infinitum/tally-sdk-rs
-cd tally-sdk-rs
+git clone https://github.com/labs-infinitum/tallyprime-sdk
+cd tallyprime-sdk
 
 cargo run --example fetch_all_accounts
 cargo run --example fetch_all_groups
