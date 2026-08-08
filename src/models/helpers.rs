@@ -60,6 +60,7 @@ pub(crate) fn build_hsn_details(
     Some(hsn)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_gst_details(
     applicable_from: Option<&String>,
     taxability: Option<&String>,

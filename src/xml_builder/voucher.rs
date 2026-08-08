@@ -74,12 +74,7 @@ impl XmlBuilder {
                         continue;
                     };
                     XmlBuilder::write_start_tag(writer, entry_tag)?;
-                    for tag in [
-                        "LEDGERNAME",
-                        "ISDEEMEDPOSITIVE",
-                        "ISPARTYLEDGER",
-                        "AMOUNT",
-                    ] {
+                    for tag in ["LEDGERNAME", "ISDEEMEDPOSITIVE", "ISPARTYLEDGER", "AMOUNT"] {
                         XmlBuilder::write_simple_if(writer, obj, tag)?;
                     }
                     if let Some(bill) = obj.get("BILLALLOCATIONS.LIST") {

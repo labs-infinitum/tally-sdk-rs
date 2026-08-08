@@ -1,6 +1,6 @@
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::StockItem;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::models::StockItem;
+use tallyprime_sdk::TallyClient;
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -48,6 +48,7 @@ fn build_stock_item() -> StockItem {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn create_stock_item_and_verify() {
     let client = make_client();
     client.test_connection().expect("connection");

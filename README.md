@@ -1,4 +1,4 @@
-# `tally-sdk-rust`
+# `tallyprime-sdk`
 
 Rust SDK for integrating with TallyPrime over XML/HTTP.
 
@@ -33,25 +33,32 @@ If you use a specific company, set it explicitly with `TALLY_COMPANY` or `TallyC
 
 ## Installation
 
+Add the crate from crates.io:
+
+```toml
+[dependencies]
+tallyprime-sdk = "0.1"
+```
+
 If you are using this crate from another local workspace:
 
 ```toml
 [dependencies]
-tally-sdk-rust = { path = "../tally-sdk-rust" }
+tallyprime-sdk = { path = "../tally-sdk-rs" }
 ```
 
 If you want to reference it from Git:
 
 ```toml
 [dependencies]
-tally-sdk-rust = { git = "https://github.com/labs-infinitum/tally-sdk-rs" }
+tallyprime-sdk = { git = "https://github.com/labs-infinitum/tally-sdk-rs" }
 ```
 
 ## Quick Start
 
 ```rust
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::TallyClient;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = TallyClient::new(TallyConfig {
@@ -166,8 +173,8 @@ Create/import calls return [`ImportResult`](src/models/import.rs), which include
 Example:
 
 ```rust
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::{Group, TallyClient};
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::{Group, TallyClient};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = TallyClient::new(TallyConfig::default())?;
@@ -284,10 +291,29 @@ Useful commands:
 ```bash
 cargo fmt
 cargo check --examples
-cargo test
+cargo test --lib
+cargo package
 ```
 
-The integration tests expect a reachable Tally instance. If no company is active and `TALLY_COMPANY` is not set, some tests will skip or fail depending on the flow.
+Unit tests under `src/` run with `cargo test` / `cargo test --lib` and do not need Tally.
+
+Integration tests under `tests/` require a reachable TallyPrime instance and are marked `#[ignore]`:
+
+```bash
+cargo test -- --ignored
+```
+
+Set `TALLY_HOST`, `TALLY_PORT`, and optionally `TALLY_COMPANY` when running ignored tests. If no company is active and `TALLY_COMPANY` is not set, some flows will skip.
+
+## Releases
+
+Publishing to crates.io is automated by GitHub Actions:
+
+1. Add a `CARGO_REGISTRY_TOKEN` secret to the repository (from [crates.io](https://crates.io/settings/tokens)).
+2. Ensure `version` in `Cargo.toml` matches the release.
+3. Tag and push, for example `git tag v0.1.0 && git push origin v0.1.0`.
+
+The release workflow also supports manual `workflow_dispatch`. The tag must be `vX.Y.Z` and must match the `Cargo.toml` version.
 
 ## Limitations
 

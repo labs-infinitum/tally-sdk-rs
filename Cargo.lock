@@ -1276,7 +1276,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tally-sdk-rust"
+name = "tallyprime-sdk"
 version = "0.1.0"
 dependencies = [
  "chrono",

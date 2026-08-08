@@ -1,6 +1,6 @@
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::Ledger;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::models::Ledger;
+use tallyprime_sdk::TallyClient;
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -105,6 +105,7 @@ fn build_bank_account_ledger() -> Ledger {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn create_bank_account_ledger_full_details() {
     let client = make_client();
     client.test_connection().expect("connection");

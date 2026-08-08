@@ -223,9 +223,9 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             narration: narration.clone(),
                             reference_date: reference_date.clone(),
                             effective_date: effective_date.clone(),
-                            is_invoice: is_invoice.as_ref().map_or(false, |v| v == "Yes"),
-                            is_cancelled: is_cancelled.as_ref().map_or(false, |v| v == "Yes"),
-                            is_optional: is_optional.as_ref().map_or(false, |v| v == "Yes"),
+                            is_invoice: is_invoice.as_ref().is_some_and(|v| v == "Yes"),
+                            is_cancelled: is_cancelled.as_ref().is_some_and(|v| v == "Yes"),
+                            is_optional: is_optional.as_ref().is_some_and(|v| v == "Yes"),
                             entry_mode: entry_mode.clone(),
                             alter_id,
                             master_id,
@@ -278,7 +278,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 forex: acct_forex.clone(),
                                 is_deemed_positive: acct_is_deemed_positive
                                     .as_ref()
-                                    .map_or(false, |v| v == "Yes"),
+                                    .is_some_and(|v| v == "Yes"),
                             });
                         }
                     }
@@ -317,7 +317,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 is_debit: amount > 0.0,
                                 is_party_ledger: ledger_entry_is_party
                                     .as_ref()
-                                    .map_or(false, |v| v == "Yes"),
+                                    .is_some_and(|v| v == "Yes"),
                                 bill_allocations: ledger_bill_allocations.clone(),
                             });
                         }
@@ -652,8 +652,7 @@ fn parse_currency_amount(text: &str) -> Option<(f32, Option<String>)> {
 fn parse_exchange_rate(text: &str) -> Option<(f32, Option<String>, Option<String>)> {
     static RE: OnceLock<Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {
-        Regex::new(r"(?x)^\s*([^\d./]+?)\s*([\d.]+)\s*/\s*(.+?)\s*$")
-            .expect("exchange rate regex")
+        Regex::new(r"(?x)^\s*([^\d./]+?)\s*([\d.]+)\s*/\s*(.+?)\s*$").expect("exchange rate regex")
     });
 
     let caps = re.captures(text)?;
@@ -772,9 +771,14 @@ mod tests {
         let vouchers = parse_vouchers_from_xml(xml);
         assert_eq!(vouchers.len(), 1);
         assert_eq!(vouchers[0].entries[0].bill_allocations.len(), 1);
-        assert_eq!(vouchers[0].entries[0].bill_allocations[0].bill_name, "INV-42");
         assert_eq!(
-            vouchers[0].entries[0].bill_allocations[0].bill_type.as_deref(),
+            vouchers[0].entries[0].bill_allocations[0].bill_name,
+            "INV-42"
+        );
+        assert_eq!(
+            vouchers[0].entries[0].bill_allocations[0]
+                .bill_type
+                .as_deref(),
             Some("Agst Ref")
         );
         assert_eq!(vouchers[0].entries[0].bill_allocations[0].amount, 1000.0);

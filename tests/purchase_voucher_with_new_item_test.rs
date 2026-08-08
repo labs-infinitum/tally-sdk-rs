@@ -1,6 +1,6 @@
-use tally_sdk_rust::client::{parse_simple_response, TallyClient};
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::{ItemInvoice, Ledger, StockItem};
+use tallyprime_sdk::client::{parse_simple_response, TallyClient};
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::models::{ItemInvoice, Ledger, StockItem};
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -197,6 +197,7 @@ fn ensure_stock_item(client: &TallyClient, name: &str) {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn purchase_voucher_with_new_party_and_item() {
     let client = make_client();
     client.test_connection().expect("connection");
@@ -247,7 +248,7 @@ fn purchase_voucher_with_new_party_and_item() {
     };
 
     // Create voucher and verify
-    let xml = tally_sdk_rust::xml_builder::XmlBuilder::create_item_invoice_request(&vch.to_map())
+    let xml = tallyprime_sdk::xml_builder::XmlBuilder::create_item_invoice_request(&vch.to_map())
         .expect("build xml");
     println!(
         "\n==== XML Voucher Request ===\n{}\n============================\n",

@@ -1,5 +1,5 @@
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::TallyClient;
 
 fn cfg_from_env() -> TallyConfig {
     let host = std::env::var("TALLY_HOST").unwrap_or_else(|_| "localhost".into());
@@ -15,13 +15,14 @@ fn cfg_from_env() -> TallyConfig {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn fetch_all_vouchers() {
     let client = TallyClient::new(cfg_from_env()).expect("client");
     // just ensure we can fetch and parse some vouchers
     let vouchers = client.get_vouchers(None, None).expect("fetch vouchers");
     // We don't assert count because it depends on company data; just ensure call succeeded
     // Optionally print a few for debugging
-    if let Some(voucher) = vouchers.get(0) {
+    if let Some(voucher) = vouchers.first() {
         println!(
             "first voucher: type={}, date={}",
             voucher.voucher_type, voucher.date_yyyymmdd

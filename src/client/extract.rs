@@ -429,9 +429,7 @@ pub(crate) fn extract_companies_from_xml(xml: &str) -> Vec<CompanyDetails> {
                     Some(b"COUNTRYNAME") => current.country_name = Some(text),
                     Some(b"COUNTRYISDCODE") => current.country_isd_code = Some(text),
                     Some(b"PINCODE") => current.pincode = Some(text),
-                    Some(b"GSTREGISTRATIONNUMBER") => {
-                        current.gst_registration_number = Some(text)
-                    }
+                    Some(b"GSTREGISTRATIONNUMBER") => current.gst_registration_number = Some(text),
                     Some(b"GSTREGISTRATIONTYPE") => current.gst_registration_type = Some(text),
                     Some(b"INCOMETAXNUMBER") => current.income_tax_number = Some(text),
                     Some(b"ISGSTON") => current.is_gst_on = parse_yes_no(&text),

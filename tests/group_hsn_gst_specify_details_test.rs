@@ -1,6 +1,6 @@
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::Group;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::models::Group;
+use tallyprime_sdk::TallyClient;
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -53,6 +53,7 @@ fn build_group() -> Group {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn create_group_hsn_gst_specify_details() {
     let client = make_client();
     client.test_connection().expect("connection");

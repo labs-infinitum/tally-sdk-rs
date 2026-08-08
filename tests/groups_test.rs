@@ -1,6 +1,6 @@
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::models::Group;
-use tally_sdk_rust::TallyClient;
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::models::Group;
+use tallyprime_sdk::TallyClient;
 
 fn make_client() -> TallyClient {
     let cfg = TallyConfig {
@@ -19,6 +19,7 @@ fn make_client() -> TallyClient {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn create_and_fetch_groups() {
     // This test hits a running TallyPrime at TALLY_HOST:TALLY_PORT
     let client = make_client();
@@ -98,6 +99,7 @@ fn create_and_fetch_groups() {
 }
 
 #[test]
+#[ignore = "requires live TallyPrime"]
 fn create_group_under_another_group() {
     let client = make_client();
     if client

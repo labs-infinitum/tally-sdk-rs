@@ -104,6 +104,6 @@ impl XmlBuilder {
             .write_event(Event::End(BytesEnd::new("ENVELOPE")))
             .map_err(|e| TallyError::Xml(e.to_string()))?;
         let bytes = writer.into_inner().into_inner();
-        Ok(String::from_utf8(bytes).map_err(|e| TallyError::Xml(e.to_string()))?)
+        String::from_utf8(bytes).map_err(|e| TallyError::Xml(e.to_string()))
     }
 }

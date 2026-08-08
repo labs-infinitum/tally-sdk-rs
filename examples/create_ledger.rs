@@ -1,7 +1,7 @@
 mod common;
 
 use common::{active_company_label, arg_value, create_client_from_env, has_flag};
-use tally_sdk_rust::Ledger;
+use tallyprime_sdk::Ledger;
 
 fn main() {
     let client = create_client_from_env();

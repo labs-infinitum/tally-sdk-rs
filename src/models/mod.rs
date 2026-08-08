@@ -12,8 +12,7 @@ mod unit;
 mod voucher;
 
 pub use collection::{
-    CurrencySummary, GroupSummary, LedgerDetails, LedgerSummary, StockItemDetails,
-    StockItemSummary,
+    CurrencySummary, GroupSummary, LedgerDetails, LedgerSummary, StockItemDetails, StockItemSummary,
 };
 pub use company::CompanyDetails;
 pub use group::Group;

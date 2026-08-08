@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use chrono::{Datelike, Local};
-use tally_sdk_rust::config::TallyConfig;
-use tally_sdk_rust::{TallyClient, Voucher, VoucherEntry};
+use tallyprime_sdk::config::TallyConfig;
+use tallyprime_sdk::{TallyClient, Voucher, VoucherEntry};
 
 pub fn create_client_from_env() -> TallyClient {
     let cfg = TallyConfig {

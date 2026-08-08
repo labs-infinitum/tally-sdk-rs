@@ -188,15 +188,17 @@ impl Voucher {
         m.insert("VOUCHERTYPENAME".into(), json!(self.voucher_type.clone()));
         m.insert("OBJVIEW".into(), json!("Accounting Voucher View"));
         m.insert("PERSISTEDVIEW".into(), json!("Accounting Voucher View"));
-        m.insert("ISINVOICE".into(), json!(if self.is_invoice { "Yes" } else { "No" }));
+        m.insert(
+            "ISINVOICE".into(),
+            json!(if self.is_invoice { "Yes" } else { "No" }),
+        );
         m.insert("DATE".into(), json!(self.date_yyyymmdd.clone()));
         m.insert(
             "EFFECTIVEDATE".into(),
-            json!(
-                self.effective_date
-                    .clone()
-                    .unwrap_or_else(|| self.date_yyyymmdd.clone())
-            ),
+            json!(self
+                .effective_date
+                .clone()
+                .unwrap_or_else(|| self.date_yyyymmdd.clone())),
         );
         if let Some(n) = &self.narration {
             m.insert("NARRATION".into(), json!(n));

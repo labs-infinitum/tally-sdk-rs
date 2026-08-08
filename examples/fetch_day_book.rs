@@ -35,7 +35,7 @@ fn main() {
     }
 }
 
-fn resolve_day_book_period(client: &tally_sdk_rust::TallyClient) -> (String, String) {
+fn resolve_day_book_period(client: &tallyprime_sdk::TallyClient) -> (String, String) {
     if arg_value("--fy").is_some() || arg_value("--from").is_some() || arg_value("--to").is_some() {
         return resolve_financial_period();
     }

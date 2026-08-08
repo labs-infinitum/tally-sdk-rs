@@ -2,8 +2,8 @@ mod common;
 
 use common::{active_company_label, arg_value, create_client_from_env, has_flag};
 use serde_json::{json, Map, Value};
-use tally_sdk_rust::client::parse_simple_response;
-use tally_sdk_rust::{Ledger, xml_builder::XmlBuilder};
+use tallyprime_sdk::client::parse_simple_response;
+use tallyprime_sdk::{xml_builder::XmlBuilder, Ledger};
 
 fn main() {
     let client = create_client_from_env();
@@ -37,15 +37,12 @@ fn main() {
     let voucher_type = arg_value("--voucher-type").unwrap_or_else(|| "Sales".into());
     let sales_ledger = arg_value("--account").unwrap_or_else(|| "SDK Sales".into());
     let date = arg_value("--date").unwrap_or_else(default_voucher_date);
-    let narration = arg_value("--narration").unwrap_or_else(|| {
-        format!("SDK ledger entry against {party_ledger}")
-    });
-    let bill_ref = arg_value("--bill-ref").unwrap_or_else(|| {
-        format!("SDK-{}", chrono::Local::now().format("%Y%m%d%H%M%S"))
-    });
-    let voucher_number = arg_value("--voucher-number").unwrap_or_else(|| {
-        format!("SDK-{}", chrono::Local::now().format("%H%M%S"))
-    });
+    let narration = arg_value("--narration")
+        .unwrap_or_else(|| format!("SDK ledger entry against {party_ledger}"));
+    let bill_ref = arg_value("--bill-ref")
+        .unwrap_or_else(|| format!("SDK-{}", chrono::Local::now().format("%Y%m%d%H%M%S")));
+    let voucher_number = arg_value("--voucher-number")
+        .unwrap_or_else(|| format!("SDK-{}", chrono::Local::now().format("%H%M%S")));
     let debug = has_flag("--debug");
 
     ensure_ledger_exists(&client, &party_ledger);
@@ -68,7 +65,9 @@ fn main() {
     });
 
     println!("Creating {voucher_type} voucher in company: {company}");
-    println!("date={date} | amount={amount:.2} | bill_ref={bill_ref} | voucher_number={voucher_number}");
+    println!(
+        "date={date} | amount={amount:.2} | bill_ref={bill_ref} | voucher_number={voucher_number}"
+    );
     println!("Dr {party_ledger} | Cr {sales_ledger}");
     if debug {
         println!("\n==== XML Voucher Request (before company injection) ===\n{xml}\n============================\n");
@@ -115,7 +114,7 @@ fn default_voucher_date() -> String {
     chrono::Local::now().format("%Y%m01").to_string()
 }
 
-fn ensure_ledger_exists(client: &tally_sdk_rust::TallyClient, name: &str) {
+fn ensure_ledger_exists(client: &tallyprime_sdk::TallyClient, name: &str) {
     let ledgers = client.get_ledgers().unwrap_or_else(|err| {
         eprintln!("Failed to fetch ledgers: {err}");
         std::process::exit(1);
@@ -128,7 +127,7 @@ fn ensure_ledger_exists(client: &tally_sdk_rust::TallyClient, name: &str) {
     }
 }
 
-fn ensure_sales_ledger(client: &tally_sdk_rust::TallyClient, name: &str) {
+fn ensure_sales_ledger(client: &tallyprime_sdk::TallyClient, name: &str) {
     let ledgers = client.get_ledgers().unwrap_or_else(|err| {
         eprintln!("Failed to fetch ledgers: {err}");
         std::process::exit(1);
@@ -206,6 +205,7 @@ fn ensure_sales_ledger(client: &tally_sdk_rust::TallyClient, name: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_sales_accounting_voucher_map(
     voucher_type: &str,
     date: &str,
