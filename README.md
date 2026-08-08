@@ -307,7 +307,7 @@ Preferred path: run the **Create Release** workflow from the Actions tab.
    - `bugfix` → `x.y.z` → `x.y.(z+1)`
    - `minor` → `x.y.z` → `x.(y+1).0`
    - `major` → `x.y.z` → `(x+1).0.0`
-3. Create Release updates `Cargo.toml` / `Cargo.lock`, commits, and tags `vX.Y.Z`.
+3. Create Release updates `Cargo.toml` / `Cargo.lock`, commits to `main`, and tags `vX.Y.Z`.
 4. It then dispatches the **Release** workflow, which publishes that tag to crates.io.
 
 You can still publish by pushing a tag yourself:

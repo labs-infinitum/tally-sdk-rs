@@ -194,18 +194,6 @@ jobs:
           echo "Created verified commit ${commit_sha}"
           echo "Created tag ${TAG} -> ${tag_object_sha}"
 
-      - name: Trigger Release workflow
-        if: inputs.dry_run != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.bump.outputs.tag }}
-        run: |
-          set -euo pipefail
-          # Tag pushes made with GITHUB_TOKEN do not start other workflows, so
-          # explicitly dispatch the existing Release workflow on the new tag.
-          gh workflow run Release.yml --ref "$TAG" -f dry_run=false
-          echo "Dispatched Release workflow for $TAG"
-
       - name: Summary
         if: always()
         run: |
