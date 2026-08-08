@@ -52,7 +52,6 @@
 //! - [`errors`] — [`TallyError`] and [`Result`]
 
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, doc(auto_cfg))]
 
 pub mod client;
 pub mod config;
