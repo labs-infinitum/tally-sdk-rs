@@ -8,6 +8,7 @@ use quick_xml::name::QName;
 use quick_xml::Reader;
 
 impl TallyClient {
+    /// Return the active/configured company name, if one can be resolved.
     pub fn active_company_name(&self) -> Result<Option<String>> {
         self.current_company_name()
     }

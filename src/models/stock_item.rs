@@ -1,37 +1,61 @@
 use crate::errors::{Result, TallyError};
 use crate::models::helpers::{build_gst_details, build_hsn_details};
 
+/// Stock item master used when creating inventory items in Tally.
 #[derive(Debug, Clone)]
 pub struct StockItem {
+    /// Display name.
     pub name: String,
+    /// Parent group or stock group name.
     pub parent: Option<String>,
+    /// Alternate names / aliases.
     pub alias: Option<Vec<String>>,
     // Units
+    /// Base unit of measure.
     pub base_units: Option<String>,
+    /// Additional / alternate unit.
     pub additional_units: Option<String>,
     // Statutory
+    /// GST applicability (`Applicable` / `Not Applicable`).
     pub gst_applicable: Option<String>,
+    /// GST type of supply (Goods, Services, Capital Goods).
     pub gst_type_of_supply: Option<String>,
+    /// Basic rate of excise.
     pub basic_rate_of_excise: Option<f64>,
+    /// Opening balance.
     pub opening_balance: Option<f64>,
 
     // HSN/GST
+    /// HSN details applicable-from date (`YYYYMMDD`).
     pub hsn_applicable_from: Option<String>,
+    /// HSN/SAC code.
     pub hsn_code: Option<String>,
+    /// HSN/SAC description.
     pub hsn_description: Option<String>,
+    /// HSN classification name when sourced from another master.
     pub hsn_classification_name: Option<String>,
+    /// Where HSN details are sourced from.
     pub hsn_source_of_details: Option<String>,
+    /// GST details applicable-from date (`YYYYMMDD`).
     pub gst_applicable_from: Option<String>,
+    /// GST taxability (for example Taxable).
     pub gst_taxability: Option<String>,
+    /// Where GST details are sourced from.
     pub gst_source_of_details: Option<String>,
+    /// GST classification name when sourced from another master.
     pub gst_classification_name: Option<String>,
+    /// State name for GST rate details.
     pub gst_state_name: Option<String>,
+    /// Duty head for the GST rate row.
     pub gst_rate_duty_head: Option<String>,
+    /// Valuation type for the GST rate row.
     pub gst_rate_valuation_type: Option<String>,
+    /// GST rate percent.
     pub gst_rate: Option<f64>,
 }
 
 impl StockItem {
+    /// Validate required fields and basic invariants before import.
     pub fn validate(&self) -> Result<()> {
         if self.name.trim().is_empty() {
             return Err(TallyError::Validation("Stock Item name is required".into()));
@@ -52,6 +76,7 @@ impl StockItem {
         Ok(())
     }
 
+    /// Convert to the Tally XML field map used by [`crate::xml_builder::XmlBuilder`].
     pub fn to_map(&self) -> serde_json::Map<String, serde_json::Value> {
         use serde_json::{json, Value};
         let mut m = serde_json::Map::new();

@@ -7,6 +7,7 @@ use std::io::Cursor;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build a generic `<ENVELOPE>` from header/body JSON-like maps.
     pub fn create_envelope(
         header: &serde_json::Map<String, Value>,
         body: Option<&serde_json::Map<String, Value>>,

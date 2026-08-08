@@ -1,33 +1,58 @@
 use crate::errors::{Result, TallyError};
 
+/// Simplified item-invoice voucher payload for Sales/Purchase.
 #[derive(Debug, Clone)]
 pub struct ItemInvoice {
+    /// Voucher type name (for example Sales, Purchase, Payment).
     pub voucher_type: String, // Sales or Purchase
+    /// Voucher date in `YYYYMMDD` form.
     pub date_yyyymmdd: String,
+    /// Party ledger name.
     pub party_ledger_name: String,
+    /// Sales/purchase ledger used on the inventory allocation.
     pub line_ledger_name: String,
+    /// Stock item name.
     pub item_name: String,
+    /// Quantity.
     pub quantity: f64,
+    /// Unit of measure for quantity/rate.
     pub unit: String,
+    /// Rate per unit.
     pub rate: f64,
+    /// Narration / remarks.
     pub narration: Option<String>,
+    /// Voucher number.
     pub voucher_number: Option<String>,
+    /// Supplier invoice / reference number.
     pub supplier_invoice_no: Option<String>,
+    /// Supplier invoice date (`YYYYMMDD`).
     pub supplier_invoice_date_yyyymmdd: Option<String>,
+    /// Receipt note number.
     pub receipt_note_no: Option<String>,
+    /// Receipt note date (`YYYYMMDD`).
     pub receipt_note_date_yyyymmdd: Option<String>,
+    /// Shipping / receipt document number.
     pub receipt_doc_no: Option<String>,
+    /// Dispatched-through / shipped-by value.
     pub dispatched_through: Option<String>,
+    /// Final destination.
     pub destination: Option<String>,
+    /// Carrier / agent name.
     pub carrier_name_agent: Option<String>,
+    /// Bill of lading number.
     pub bill_of_lading_no: Option<String>,
+    /// Bill of lading date (`YYYYMMDD`).
     pub bill_of_lading_date_yyyymmdd: Option<String>,
+    /// Motor vehicle / vessel number.
     pub motor_vehicle_no: Option<String>,
+    /// Override inventory `ISDEEMEDPOSITIVE` (defaults by voucher type).
     pub inventory_is_deemed_positive: Option<bool>,
+    /// Override party `ISDEEMEDPOSITIVE`.
     pub party_is_deemed_positive: Option<bool>,
 }
 
 impl ItemInvoice {
+    /// Validate required fields and basic invariants before import.
     pub fn validate(&self) -> Result<()> {
         if !matches!(self.voucher_type.as_str(), "Sales" | "Purchase") {
             return Err(TallyError::Validation(
@@ -51,6 +76,7 @@ impl ItemInvoice {
         Ok(())
     }
 
+    /// Convert to the Tally XML field map used by [`crate::xml_builder::XmlBuilder`].
     pub fn to_map(&self) -> serde_json::Map<String, serde_json::Value> {
         use serde_json::{json, Value};
         let mut m = serde_json::Map::new();

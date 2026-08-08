@@ -15,6 +15,7 @@ exclude = [".claude/", ".idea/", "tmp/", ".env", ".github/"]
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"] }

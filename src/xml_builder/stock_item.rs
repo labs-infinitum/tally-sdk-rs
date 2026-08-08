@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build an All Masters import request that creates a stock item.
     pub fn create_stock_item_request(item_map: &serde_json::Map<String, Value>) -> Result<String> {
         let name = item_map.get("NAME").and_then(|v| v.as_str()).unwrap_or("");
         XmlBuilder::create_all_masters_import_request(|writer| {

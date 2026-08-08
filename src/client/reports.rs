@@ -6,6 +6,10 @@ use crate::models::{
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
+    /// Export the Trial Balance report for an optional date range.
+    ///
+    /// Dates use `YYYYMMDD`. When `explode_flag` is `true`, Tally expands nested
+    /// groups in the XML response.
     pub fn get_trial_balance(
         &self,
         from_date: Option<&str>,
@@ -16,6 +20,7 @@ impl TallyClient {
         Ok(report_parser::parse_trial_balance_from_xml(&resp))
     }
 
+    /// Export the Balance Sheet report for an optional date range.
     pub fn get_balance_sheet(
         &self,
         from_date: Option<&str>,
@@ -26,6 +31,7 @@ impl TallyClient {
         Ok(report_parser::parse_balance_sheet_from_xml(&resp))
     }
 
+    /// Export the Profit and Loss report for an optional date range.
     pub fn get_profit_and_loss(
         &self,
         from_date: Option<&str>,

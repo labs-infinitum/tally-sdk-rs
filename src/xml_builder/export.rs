@@ -6,6 +6,7 @@ use std::io::Cursor;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build a collection/data export request for a Tally collection type.
     pub fn create_export_request(
         request_type: &str,
         collection_type: &str,
@@ -51,6 +52,7 @@ impl XmlBuilder {
         XmlBuilder::create_envelope(&header, Some(&body))
     }
 
+    /// Build a voucher/Day Book export request for an optional date range.
     pub fn create_voucher_export_request(
         from_date: Option<&str>,
         to_date: Option<&str>,
@@ -117,6 +119,7 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Build a company master export request.
     pub fn create_company_export_request(current_company: Option<&str>) -> Result<String> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_export_envelope_header(
@@ -190,6 +193,7 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Build a currency collection export request.
     pub fn create_currency_export_request(current_company: Option<&str>) -> Result<String> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_export_envelope_header(
@@ -246,6 +250,7 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Build a rich ledger master export request.
     pub fn create_ledger_export_request(current_company: Option<&str>) -> Result<String> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_export_envelope_header(
@@ -314,6 +319,7 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Build a rich stock item master export request.
     pub fn create_stock_item_export_request(current_company: Option<&str>) -> Result<String> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_export_envelope_header(
@@ -376,6 +382,7 @@ impl XmlBuilder {
     ///
     /// Avoid `TYPE=Data ID=Company` / bare `ID=Company` — those can make Tally open
     /// `Form:Company` and raise `No 'PARTS'!`.
+    /// Build a lightweight company-list export used for connectivity checks.
     pub fn create_company_list_export_request() -> Result<String> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
         XmlBuilder::write_export_envelope_header(
@@ -408,6 +415,7 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    /// Build an export request for a named Tally builtin report (TB, BS, P&L, GST Computation, …).
     pub fn create_builtin_report_request(
         report_name: &str,
         from_date: Option<&str>,

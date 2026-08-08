@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build an invoice-view voucher import request (item invoice flow).
     pub fn create_item_invoice_request(vch: &serde_json::Map<String, Value>) -> Result<String> {
         let name = vch
             .get("VOUCHERTYPENAME")

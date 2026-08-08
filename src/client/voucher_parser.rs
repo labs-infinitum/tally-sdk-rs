@@ -1,3 +1,5 @@
+//! Parse Day Book / voucher export XML into [`crate::Voucher`] values.
+
 use crate::models::{
     AccountingAllocation, BatchAllocation, BillAllocation, ForexDetails, GstRateDetail, Item,
     Voucher, VoucherEntry,
@@ -8,6 +10,7 @@ use quick_xml::Reader;
 use regex::Regex;
 use std::sync::OnceLock;
 
+/// Parse Tally voucher/Day Book XML into typed [`Voucher`] structs.
 pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut reader = Reader::from_reader(xml.as_bytes());
     reader.trim_text(true);

@@ -2,6 +2,10 @@ use super::TallyClient;
 use crate::errors::{Result, TallyError};
 
 impl TallyClient {
+    /// POST raw XML to Tally after injecting the current company when needed.
+    ///
+    /// Prefer typed client methods when available. Use this for custom TDL /
+    /// report XML built with [`crate::xml_builder::XmlBuilder`].
     pub fn post_xml(&self, xml: &str) -> Result<String> {
         let prepared = self.prepare_request_xml(xml)?;
         self.post_raw_xml(&prepared)

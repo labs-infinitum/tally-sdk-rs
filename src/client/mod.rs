@@ -1,3 +1,13 @@
+//! Blocking HTTP client for TallyPrime XML integration.
+//!
+//! The main type is [`TallyClient`]. Methods are implemented across this module
+//! tree (`company`, `masters`, `vouchers`, `reports`, …) but all appear on
+//! `TallyClient` in rustdoc.
+//!
+//! Advanced helpers:
+//! - [`parse_simple_response`] — parse import/create response counters
+//! - [`voucher_parser`] — parse raw Day Book / voucher XML
+
 use crate::config::TallyConfig;
 use crate::errors::{Result, TallyError};
 use crate::xml_builder::XmlBuilder;
@@ -14,6 +24,12 @@ mod reports;
 pub mod voucher_parser;
 mod vouchers;
 
+/// Blocking client for TallyPrime XML/HTTP.
+///
+/// Construct with [`TallyClient::new`], optionally call [`Self::test_connection`],
+/// then use the typed master/voucher/report methods. Dates are generally
+/// `YYYYMMDD`. Company context comes from [`TallyConfig::current_company`] or
+/// the company currently loaded in Tally.
 pub struct TallyClient {
     cfg: TallyConfig,
     http: reqwest::blocking::Client,
@@ -22,6 +38,10 @@ pub struct TallyClient {
 }
 
 impl TallyClient {
+    /// Build a client from [`TallyConfig`].
+    ///
+    /// Configures a blocking `reqwest` client with `text/xml;charset=utf-16`
+    /// and optional Tally.NET headers.
     pub fn new(cfg: TallyConfig) -> Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         // UTF-16 is required for currency/special symbols such as ₹.
@@ -60,6 +80,9 @@ impl TallyClient {
         })
     }
 
+    /// Probe Tally with a lightweight company-list export.
+    ///
+    /// Returns `Ok(true)` when Tally answers successfully.
     pub fn test_connection(&self) -> Result<bool> {
         let xml = XmlBuilder::create_company_list_export_request()?;
         let _resp = self.post_raw_xml(&xml)?;
@@ -67,4 +90,5 @@ impl TallyClient {
     }
 }
 
+/// Parse a Tally import/create XML response into [`crate::ImportResult`].
 pub use parse::parse_simple_response_public as parse_simple_response;

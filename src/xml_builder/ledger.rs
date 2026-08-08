@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build an All Masters import request that creates a ledger.
     pub fn create_ledger_request(ledger_map: &serde_json::Map<String, Value>) -> Result<String> {
         XmlBuilder::create_all_masters_import_request(|writer| {
             XmlBuilder::write_start_tag_with_attrs(writer, "LEDGER", &[("Action", "Create")])?;

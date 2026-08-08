@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::XmlBuilder;
 
 impl XmlBuilder {
+    /// Build an All Masters import request that creates a group.
     pub fn create_group_request(group_map: &serde_json::Map<String, Value>) -> Result<String> {
         let name = group_map
             .get("NAME")

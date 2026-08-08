@@ -11,6 +11,7 @@ use crate::models::{
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
+    /// Create a ledger master in Tally.
     pub fn create_ledger(&self, ledger: &Ledger) -> Result<ImportResult> {
         ledger.validate()?;
         let map = ledger.to_map();
@@ -18,6 +19,7 @@ impl TallyClient {
         self.execute_create_request(&xml)
     }
 
+    /// Same as [`Self::create_ledger`], but prints the XML request/response.
     pub fn create_ledger_debug(&self, ledger: &Ledger) -> Result<ImportResult> {
         ledger.validate()?;
         let map = ledger.to_map();
@@ -25,6 +27,7 @@ impl TallyClient {
         self.execute_debug_create_request(&xml)
     }
 
+    /// Create a group master in Tally.
     pub fn create_group(&self, group: &Group) -> Result<ImportResult> {
         group.validate()?;
         let map = group.to_map();
@@ -32,6 +35,7 @@ impl TallyClient {
         self.execute_create_request(&xml)
     }
 
+    /// Same as [`Self::create_group`], but prints the XML request/response.
     pub fn create_group_debug(&self, group: &Group) -> Result<ImportResult> {
         group.validate()?;
         let map = group.to_map();
@@ -39,6 +43,7 @@ impl TallyClient {
         self.execute_debug_create_request(&xml)
     }
 
+    /// Create a stock item master in Tally.
     pub fn create_stock_item(&self, item: &StockItem) -> Result<ImportResult> {
         item.validate()?;
         let map = item.to_map();
@@ -46,6 +51,7 @@ impl TallyClient {
         self.execute_create_request(&xml)
     }
 
+    /// Same as [`Self::create_stock_item`], but prints the XML request/response.
     pub fn create_stock_item_debug(&self, item: &StockItem) -> Result<ImportResult> {
         item.validate()?;
         let map = item.to_map();
@@ -53,18 +59,22 @@ impl TallyClient {
         self.execute_debug_create_request(&xml)
     }
 
+    /// List ledger names (and parents when available).
     pub fn get_ledgers(&self) -> Result<Vec<LedgerSummary>> {
         self.fetch_name_parent_collection("Ledger", extract_ledgers_from_xml)
     }
 
+    /// List group names (and parents when available).
     pub fn get_groups(&self) -> Result<Vec<GroupSummary>> {
         self.fetch_name_parent_collection("Group", extract_groups_from_xml)
     }
 
+    /// List stock item names (and parents when available).
     pub fn get_stock_items(&self) -> Result<Vec<StockItemSummary>> {
         self.fetch_name_parent_collection("Stock Item", extract_stock_items_from_xml)
     }
 
+    /// List currencies configured in the company.
     pub fn get_currencies(&self) -> Result<Vec<CurrencySummary>> {
         let current_company = self.current_company_name()?;
         let xml = XmlBuilder::create_currency_export_request(current_company.as_deref())?;
@@ -72,6 +82,7 @@ impl TallyClient {
         Ok(extract_currencies_from_xml(&resp))
     }
 
+    /// Export rich ledger master details (mailing, GSTIN, bank, opening balance, …).
     pub fn get_ledger_details(&self) -> Result<Vec<LedgerDetails>> {
         let current_company = self.current_company_name()?;
         let xml = XmlBuilder::create_ledger_export_request(current_company.as_deref())?;
@@ -79,6 +90,7 @@ impl TallyClient {
         Ok(extract_ledger_details_from_xml(&resp))
     }
 
+    /// Export rich stock item details (units, HSN/GST, opening values, …).
     pub fn get_stock_item_details(&self) -> Result<Vec<StockItemDetails>> {
         let current_company = self.current_company_name()?;
         let xml = XmlBuilder::create_stock_item_export_request(current_company.as_deref())?;

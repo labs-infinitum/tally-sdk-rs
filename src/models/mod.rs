@@ -1,3 +1,8 @@
+//! Typed request and response models used by [`crate::TallyClient`].
+//!
+//! Create helpers take structs such as [`Ledger`], [`Group`], and [`Voucher`].
+//! Read helpers return summaries, rich details, report rows, or GST aggregates.
+
 mod collection;
 mod company;
 mod group;

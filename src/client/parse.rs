@@ -1,7 +1,10 @@
+//! Helpers for parsing Tally import/create response envelopes.
+
 use crate::models::ImportResult;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
+/// Parse a Tally import response into [`ImportResult`] counters and line errors.
 pub fn parse_simple_response_public(xml: &str) -> ImportResult {
     let mut reader = Reader::from_reader(xml.as_bytes());
     reader.trim_text(true);
