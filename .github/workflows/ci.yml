@@ -38,3 +38,9 @@ jobs:
 
       - name: Package dry-run
         run: cargo package --locked
+
+      # cargo package leaves verify trees with dangling symlinks that break
+      # Swatinem/rust-cache post-job cleanup.
+      - name: Remove cargo package artifacts
+        if: always()
+        run: rm -rf target/package
