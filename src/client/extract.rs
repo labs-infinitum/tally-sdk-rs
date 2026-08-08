@@ -1,5 +1,6 @@
 use crate::models::{
-    CompanyDetails, CurrencySummary, GroupSummary, LedgerSummary, StockItemSummary,
+    CompanyDetails, CurrencySummary, GroupSummary, LedgerDetails, LedgerSummary, StockItemDetails,
+    StockItemSummary,
 };
 use quick_xml::events::Event;
 use quick_xml::name::QName;
@@ -175,6 +176,203 @@ pub(crate) fn extract_currencies_from_xml(xml: &str) -> Vec<CurrencySummary> {
     }
 
     currencies
+}
+
+pub(crate) fn extract_ledger_details_from_xml(xml: &str) -> Vec<LedgerDetails> {
+    let mut reader = Reader::from_reader(xml.as_bytes());
+    reader.trim_text(true);
+
+    let mut ledgers = Vec::new();
+    let mut path: Vec<Vec<u8>> = Vec::new();
+    let mut current = LedgerDetails::default();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                path.push(e.name().as_ref().to_vec());
+                if e.name() == QName(b"LEDGER") {
+                    current = LedgerDetails::default();
+                    if let Some(name) = extract_name_attr(e) {
+                        current.name = name;
+                    }
+                }
+            }
+            Ok(Event::Empty(ref e)) if e.name() == QName(b"LEDGER") => {
+                if let Some(name) = extract_name_attr(e) {
+                    ledgers.push(LedgerDetails {
+                        name,
+                        ..LedgerDetails::default()
+                    });
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if !path.iter().any(|tag| tag.as_slice() == b"LEDGER") {
+                    continue;
+                }
+                let text = e.unescape().unwrap_or_default().trim().to_string();
+                if text.is_empty() {
+                    continue;
+                }
+                match path.last().map(|tag| tag.as_slice()) {
+                    Some(b"NAME") if current.name.is_empty() => current.name = text,
+                    Some(b"PARENT") => current.parent = Some(text),
+                    Some(b"GUID") => current.guid = Some(text),
+                    Some(b"MAILINGNAME") => current.mailing_name = Some(text),
+                    Some(b"ADDRESS") => current.address.push(text),
+                    Some(b"STATENAME") | Some(b"LEDSTATENAME") | Some(b"PRIORSTATENAME")
+                        if current.state_name.is_none() =>
+                    {
+                        current.state_name = Some(text)
+                    }
+                    Some(b"COUNTRYNAME") => current.country_name = Some(text),
+                    Some(b"PINCODE") => current.pincode = Some(text),
+                    Some(b"EMAIL") | Some(b"LEDGERCONTACT") if current.email.is_none() => {
+                        current.email = Some(text)
+                    }
+                    Some(b"LEDGERPHONE") | Some(b"LEDGERMOBILE") | Some(b"PHONE")
+                        if current.phone.is_none() =>
+                    {
+                        current.phone = Some(text)
+                    }
+                    Some(b"INCOMETAXNUMBER") => current.income_tax_number = Some(text),
+                    Some(b"PARTYGSTIN") | Some(b"PARTYGSTINNUMBER") | Some(b"GSTIN")
+                        if current.party_gstin.is_none() =>
+                    {
+                        current.party_gstin = Some(text)
+                    }
+                    Some(b"GSTREGISTRATIONTYPE") => current.gst_registration_type = Some(text),
+                    Some(b"OPENINGBALANCE") => current.opening_balance = parse_amount_f64(&text),
+                    Some(b"ISBILLWISEON") => current.is_billwise_on = parse_yes_no(&text),
+                    Some(b"BILLCREDITPERIOD") => current.bill_credit_period = Some(text),
+                    Some(b"BANKACCOUNTNUMBER") | Some(b"ACCOUNTNUMBER")
+                        if current.account_number.is_none() =>
+                    {
+                        current.account_number = Some(text)
+                    }
+                    Some(b"IFSCODE") | Some(b"IFSCCODE") if current.ifsc_code.is_none() => {
+                        current.ifsc_code = Some(text)
+                    }
+                    Some(b"BANKNAME") => current.bank_name = Some(text),
+                    Some(b"BANKACCOUNTHOLDER") | Some(b"BANKACCHOLDERNAME")
+                        if current.bank_account_holder.is_none() =>
+                    {
+                        current.bank_account_holder = Some(text)
+                    }
+                    Some(b"SWIFTCODE") => current.swift_code = Some(text),
+                    Some(b"BRANCHNAME") => current.branch_name = Some(text),
+                    Some(b"CURRENCYNAME") => current.currency_name = Some(text),
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                if e.name() == QName(b"LEDGER") {
+                    if !current.name.is_empty() {
+                        ledgers.push(std::mem::take(&mut current));
+                    }
+                    current = LedgerDetails::default();
+                }
+                path.pop();
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+
+    ledgers
+}
+
+pub(crate) fn extract_stock_item_details_from_xml(xml: &str) -> Vec<StockItemDetails> {
+    let mut reader = Reader::from_reader(xml.as_bytes());
+    reader.trim_text(true);
+
+    let mut items = Vec::new();
+    let mut path: Vec<Vec<u8>> = Vec::new();
+    let mut current = StockItemDetails::default();
+    let mut in_gst_rate_list = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                path.push(e.name().as_ref().to_vec());
+                if e.name() == QName(b"STOCKITEM") {
+                    current = StockItemDetails::default();
+                    if let Some(name) = extract_name_attr(e) {
+                        current.name = name;
+                    }
+                } else if e.name() == QName(b"RATEDETAILS.LIST")
+                    || e.name() == QName(b"GSTDETAILS.LIST")
+                {
+                    in_gst_rate_list = true;
+                }
+            }
+            Ok(Event::Empty(ref e)) if e.name() == QName(b"STOCKITEM") => {
+                if let Some(name) = extract_name_attr(e) {
+                    items.push(StockItemDetails {
+                        name,
+                        ..StockItemDetails::default()
+                    });
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if !path.iter().any(|tag| tag.as_slice() == b"STOCKITEM") {
+                    continue;
+                }
+                let text = e.unescape().unwrap_or_default().trim().to_string();
+                if text.is_empty() {
+                    continue;
+                }
+                match path.last().map(|tag| tag.as_slice()) {
+                    Some(b"NAME") if current.name.is_empty() => current.name = text,
+                    Some(b"PARENT") => current.parent = Some(text),
+                    Some(b"GUID") => current.guid = Some(text),
+                    Some(b"BASEUNITS") => current.base_units = Some(text),
+                    Some(b"ADDITIONALUNITS") => current.additional_units = Some(text),
+                    Some(b"GSTAPPLICABLE") => current.gst_applicable = Some(text),
+                    Some(b"GSTTYPEOFSUPPLY") => current.gst_type_of_supply = Some(text),
+                    Some(b"GSTHSNNAME") | Some(b"HSNCODE") if current.hsn_code.is_none() => {
+                        current.hsn_code = Some(text)
+                    }
+                    Some(b"GSTHSNDESCRIPTION") | Some(b"HSNDESCRIPTION")
+                        if current.hsn_description.is_none() =>
+                    {
+                        current.hsn_description = Some(text)
+                    }
+                    Some(b"GSTTAXABILITY") | Some(b"TAXABILITY")
+                        if current.gst_taxability.is_none() =>
+                    {
+                        current.gst_taxability = Some(text)
+                    }
+                    Some(b"GSTRATE") if current.gst_rate.is_none() => {
+                        current.gst_rate = parse_amount_f64(&text)
+                    }
+                    Some(b"OPENINGRATE") => current.opening_rate = parse_amount_f64(&text),
+                    Some(b"OPENINGBALANCE") => current.opening_balance = parse_amount_f64(&text),
+                    Some(b"RATE") if in_gst_rate_list && current.gst_rate.is_none() => {
+                        current.gst_rate = parse_amount_f64(&text)
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                if e.name() == QName(b"RATEDETAILS.LIST") || e.name() == QName(b"GSTDETAILS.LIST") {
+                    in_gst_rate_list = false;
+                }
+                if e.name() == QName(b"STOCKITEM") {
+                    if !current.name.is_empty() {
+                        items.push(std::mem::take(&mut current));
+                    }
+                    current = StockItemDetails::default();
+                }
+                path.pop();
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+
+    items
 }
 
 pub(crate) fn extract_companies_from_xml(xml: &str) -> Vec<CompanyDetails> {
@@ -477,11 +675,25 @@ fn parse_i32(text: &str) -> Option<i32> {
     text.trim().parse().ok()
 }
 
+fn parse_amount_f64(text: &str) -> Option<f64> {
+    let cleaned: String = text
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == '/')
+        .collect();
+    // Tally sometimes emits "100.00/Nos" style values — take the numeric prefix.
+    let numeric = cleaned.split('/').next().unwrap_or(&cleaned).trim();
+    if numeric.is_empty() {
+        return None;
+    }
+    numeric.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         extract_companies_from_xml, extract_currencies_from_xml, extract_groups_from_xml,
-        extract_ledgers_from_xml, extract_stock_items_from_xml,
+        extract_ledger_details_from_xml, extract_ledgers_from_xml,
+        extract_stock_item_details_from_xml, extract_stock_items_from_xml,
     };
 
     #[test]
@@ -599,5 +811,58 @@ mod tests {
         assert_eq!(ledgers[0].parent.as_deref(), Some("Current Assets"));
         assert_eq!(items[0].name, "Keyboard");
         assert_eq!(items[0].parent.as_deref(), Some("Peripherals"));
+    }
+
+    #[test]
+    fn extracts_ledger_details_with_party_fields() {
+        let xml = r#"
+<ENVELOPE>
+  <LEDGER NAME="Acme Traders">
+    <PARENT>Sundry Debtors</PARENT>
+    <GUID>abc-123</GUID>
+    <MAILINGNAME>Acme Traders</MAILINGNAME>
+    <ADDRESS.LIST>
+      <ADDRESS>12 MG Road</ADDRESS>
+      <ADDRESS>Near Metro</ADDRESS>
+    </ADDRESS.LIST>
+    <STATENAME>Maharashtra</STATENAME>
+    <COUNTRYNAME>India</COUNTRYNAME>
+    <PINCODE>400001</PINCODE>
+    <PARTYGSTIN>27AAAAA0000A1Z5</PARTYGSTIN>
+    <OPENINGBALANCE>1500.50</OPENINGBALANCE>
+    <ISBILLWISEON>Yes</ISBILLWISEON>
+  </LEDGER>
+</ENVELOPE>
+"#;
+        let rows = extract_ledger_details_from_xml(xml);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "Acme Traders");
+        assert_eq!(rows[0].parent.as_deref(), Some("Sundry Debtors"));
+        assert_eq!(rows[0].party_gstin.as_deref(), Some("27AAAAA0000A1Z5"));
+        assert_eq!(rows[0].address.len(), 2);
+        assert_eq!(rows[0].opening_balance, Some(1500.50));
+        assert_eq!(rows[0].is_billwise_on, Some(true));
+    }
+
+    #[test]
+    fn extracts_stock_item_details() {
+        let xml = r#"
+<ENVELOPE>
+  <STOCKITEM NAME="Widget">
+    <PARENT>Primary</PARENT>
+    <BASEUNITS>Nos</BASEUNITS>
+    <GSTTYPEOFSUPPLY>Goods</GSTTYPEOFSUPPLY>
+    <GSTHSNNAME>8471</GSTHSNNAME>
+    <GSTTAXABILITY>Taxable</GSTTAXABILITY>
+    <OPENINGRATE>99.5</OPENINGRATE>
+  </STOCKITEM>
+</ENVELOPE>
+"#;
+        let rows = extract_stock_item_details_from_xml(xml);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "Widget");
+        assert_eq!(rows[0].base_units.as_deref(), Some("Nos"));
+        assert_eq!(rows[0].hsn_code.as_deref(), Some("8471"));
+        assert_eq!(rows[0].opening_rate, Some(99.5));
     }
 }

@@ -60,6 +60,15 @@ pub struct AccountingAllocation {
     pub is_deemed_positive: bool,
 }
 
+/// Bill-wise allocation on a ledger entry (for invoice settlement).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BillAllocation {
+    pub bill_name: String,
+    pub bill_type: Option<String>,
+    pub amount: f32,
+    pub forex: Option<ForexDetails>,
+}
+
 #[derive(Debug, Clone)]
 pub struct VoucherEntry {
     pub ledger_name: String,
@@ -67,6 +76,7 @@ pub struct VoucherEntry {
     pub forex: Option<ForexDetails>,
     pub is_debit: bool,
     pub is_party_ledger: bool,
+    pub bill_allocations: Vec<BillAllocation>,
 }
 
 impl VoucherEntry {

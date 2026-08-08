@@ -1,6 +1,6 @@
 use crate::models::{
-    AccountingAllocation, BatchAllocation, ForexDetails, GstRateDetail, Item, Voucher,
-    VoucherEntry,
+    AccountingAllocation, BatchAllocation, BillAllocation, ForexDetails, GstRateDetail, Item,
+    Voucher, VoucherEntry,
 };
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
@@ -77,6 +77,13 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
     let mut ledger_entry_amount: Option<f32> = None;
     let mut ledger_entry_forex: Option<ForexDetails> = None;
     let mut ledger_entry_is_party: Option<String> = None;
+    let mut ledger_bill_allocations: Vec<BillAllocation> = vec![];
+
+    // Bill allocation fields
+    let mut bill_name: Option<String> = None;
+    let mut bill_type: Option<String> = None;
+    let mut bill_amount: Option<f32> = None;
+    let mut bill_forex: Option<ForexDetails> = None;
 
     // Collections
     let mut vouchers: Vec<Voucher> = vec![];
@@ -173,12 +180,20 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         ledger_entry_amount = None;
                         ledger_entry_forex = None;
                         ledger_entry_is_party = None;
+                        ledger_bill_allocations = vec![];
                     }
                     QName(b"ALLLEDGERENTRIES.LIST") => {
                         ledger_entry_name = None;
                         ledger_entry_amount = None;
                         ledger_entry_forex = None;
                         ledger_entry_is_party = None;
+                        ledger_bill_allocations = vec![];
+                    }
+                    QName(b"BILLALLOCATIONS.LIST") => {
+                        bill_name = None;
+                        bill_type = None;
+                        bill_amount = None;
+                        bill_forex = None;
                     }
                     _ => {}
                 }
@@ -280,6 +295,17 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                         }
                     }
 
+                    QName(b"BILLALLOCATIONS.LIST") => {
+                        if let (Some(name), Some(amount)) = (bill_name.clone(), bill_amount) {
+                            ledger_bill_allocations.push(BillAllocation {
+                                bill_name: name,
+                                bill_type: bill_type.clone(),
+                                amount: amount.abs(),
+                                forex: bill_forex.clone().map(abs_forex),
+                            });
+                        }
+                    }
+
                     QName(b"LEDGERENTRIES.LIST") | QName(b"ALLLEDGERENTRIES.LIST") => {
                         if let (Some(name), Some(amount)) =
                             (ledger_entry_name.clone(), ledger_entry_amount)
@@ -292,6 +318,7 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                                 is_party_ledger: ledger_entry_is_party
                                     .as_ref()
                                     .map_or(false, |v| v == "Yes"),
+                                bill_allocations: ledger_bill_allocations.clone(),
                             });
                         }
                     }
@@ -480,16 +507,34 @@ pub fn parse_vouchers_from_xml(xml: &str) -> Vec<Voucher> {
                             gst_rate_valuation_type = Some(text);
                         }
 
+                        // Bill allocations (under ledger entries)
+                        QName(b"BILLNAME") | QName(b"NAME")
+                            if in_context(b"BILLALLOCATIONS.LIST") && bill_name.is_none() =>
+                        {
+                            bill_name = Some(text);
+                        }
+                        QName(b"BILLTYPE") if in_context(b"BILLALLOCATIONS.LIST") => {
+                            bill_type = Some(text);
+                        }
+                        QName(b"AMOUNT") if in_context(b"BILLALLOCATIONS.LIST") => {
+                            if let Some(parsed) = parse_tally_amount_details(&text) {
+                                bill_amount = Some(parsed.amount);
+                                bill_forex = parsed.forex;
+                            }
+                        }
+
                         // Ledger entry fields
                         QName(b"LEDGERNAME")
                             if in_ledger_entries()
-                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST")
+                                && !in_context(b"BILLALLOCATIONS.LIST") =>
                         {
                             ledger_entry_name = Some(text);
                         }
                         QName(b"AMOUNT")
                             if in_ledger_entries()
-                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST") =>
+                                && !in_context(b"ACCOUNTINGALLOCATIONS.LIST")
+                                && !in_context(b"BILLALLOCATIONS.LIST") =>
                         {
                             if let Some(parsed) = parse_tally_amount_details(&text) {
                                 ledger_entry_amount = Some(parsed.amount);
@@ -694,6 +739,45 @@ mod tests {
         assert!(voucher.entries[0].is_party_ledger);
         assert_eq!(voucher.entries[0].amount, 250000.0);
         assert!(voucher.entries[0].forex.is_none());
+        assert!(voucher.entries[0].bill_allocations.is_empty());
+    }
+
+    #[test]
+    fn parses_bill_allocations_on_ledger_entries() {
+        let xml = r#"
+<ENVELOPE>
+  <VOUCHER>
+    <GUID>rcpt-1</GUID>
+    <DATE>20250615</DATE>
+    <VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME>
+    <VOUCHERNUMBER>R-1</VOUCHERNUMBER>
+    <ALLLEDGERENTRIES.LIST>
+      <LEDGERNAME>Acme Traders</LEDGERNAME>
+      <ISPARTYLEDGER>Yes</ISPARTYLEDGER>
+      <AMOUNT>-1000.00</AMOUNT>
+      <BILLALLOCATIONS.LIST>
+        <BILLNAME>INV-42</BILLNAME>
+        <BILLTYPE>Agst Ref</BILLTYPE>
+        <AMOUNT>-1000.00</AMOUNT>
+      </BILLALLOCATIONS.LIST>
+    </ALLLEDGERENTRIES.LIST>
+    <ALLLEDGERENTRIES.LIST>
+      <LEDGERNAME>Cash</LEDGERNAME>
+      <ISPARTYLEDGER>No</ISPARTYLEDGER>
+      <AMOUNT>1000.00</AMOUNT>
+    </ALLLEDGERENTRIES.LIST>
+  </VOUCHER>
+</ENVELOPE>
+"#;
+        let vouchers = parse_vouchers_from_xml(xml);
+        assert_eq!(vouchers.len(), 1);
+        assert_eq!(vouchers[0].entries[0].bill_allocations.len(), 1);
+        assert_eq!(vouchers[0].entries[0].bill_allocations[0].bill_name, "INV-42");
+        assert_eq!(
+            vouchers[0].entries[0].bill_allocations[0].bill_type.as_deref(),
+            Some("Agst Ref")
+        );
+        assert_eq!(vouchers[0].entries[0].bill_allocations[0].amount, 1000.0);
     }
 
     #[test]

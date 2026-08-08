@@ -1,12 +1,12 @@
 use super::extract::{
-    extract_currencies_from_xml, extract_groups_from_xml, extract_ledgers_from_xml,
-    extract_stock_items_from_xml,
+    extract_currencies_from_xml, extract_groups_from_xml, extract_ledger_details_from_xml,
+    extract_ledgers_from_xml, extract_stock_item_details_from_xml, extract_stock_items_from_xml,
 };
 use super::{parse, TallyClient};
 use crate::errors::Result;
 use crate::models::{
-    CurrencySummary, Group, GroupSummary, ImportResult, Ledger, LedgerSummary, StockItem,
-    StockItemSummary,
+    CurrencySummary, Group, GroupSummary, ImportResult, Ledger, LedgerDetails, LedgerSummary,
+    StockItem, StockItemDetails, StockItemSummary,
 };
 use crate::xml_builder::XmlBuilder;
 
@@ -70,6 +70,20 @@ impl TallyClient {
         let xml = XmlBuilder::create_currency_export_request(current_company.as_deref())?;
         let resp = self.post_xml(&xml)?;
         Ok(extract_currencies_from_xml(&resp))
+    }
+
+    pub fn get_ledger_details(&self) -> Result<Vec<LedgerDetails>> {
+        let current_company = self.current_company_name()?;
+        let xml = XmlBuilder::create_ledger_export_request(current_company.as_deref())?;
+        let resp = self.post_xml(&xml)?;
+        Ok(extract_ledger_details_from_xml(&resp))
+    }
+
+    pub fn get_stock_item_details(&self) -> Result<Vec<StockItemDetails>> {
+        let current_company = self.current_company_name()?;
+        let xml = XmlBuilder::create_stock_item_export_request(current_company.as_deref())?;
+        let resp = self.post_xml(&xml)?;
+        Ok(extract_stock_item_details_from_xml(&resp))
     }
 
     fn execute_create_request(&self, xml: &str) -> Result<ImportResult> {

@@ -11,7 +11,10 @@ mod stock_item;
 mod unit;
 mod voucher;
 
-pub use collection::{CurrencySummary, GroupSummary, LedgerSummary, StockItemSummary};
+pub use collection::{
+    CurrencySummary, GroupSummary, LedgerDetails, LedgerSummary, StockItemDetails,
+    StockItemSummary,
+};
 pub use company::CompanyDetails;
 pub use group::Group;
 pub use import::ImportResult;
@@ -22,6 +25,6 @@ pub use stock_group::StockGroup;
 pub use stock_item::StockItem;
 pub use unit::Unit;
 pub use voucher::{
-    AccountingAllocation, BatchAllocation, ForexDetails, GstRateDetail, Item, Voucher,
-    VoucherEntry,
+    AccountingAllocation, BatchAllocation, BillAllocation, ForexDetails, GstRateDetail, Item,
+    Voucher, VoucherEntry,
 };

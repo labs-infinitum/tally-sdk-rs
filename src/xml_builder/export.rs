@@ -246,6 +246,132 @@ impl XmlBuilder {
         XmlBuilder::finish_writer(writer)
     }
 
+    pub fn create_ledger_export_request(current_company: Option<&str>) -> Result<String> {
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_export_envelope_header(
+            &mut writer,
+            "EXPORT",
+            "COLLECTION",
+            "CustomLedgerCollection",
+        )?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
+        XmlBuilder::write_current_company_tag(&mut writer, current_company)?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "COLLECTION",
+            &[
+                ("NAME", "CustomLedgerCollection"),
+                ("ISMODIFY", "No"),
+                ("ISFIXED", "No"),
+                ("ISINITIALIZE", "No"),
+                ("ISOPTION", "No"),
+                ("ISINTERNAL", "No"),
+                ("FETCHALLFIELDS", "Yes"),
+            ],
+        )?;
+        XmlBuilder::write_text_node(&mut writer, "TYPE", "Ledger")?;
+        XmlBuilder::write_text_node(&mut writer, "NATIVEMETHOD", "*, *.*")?;
+        for field in [
+            "Name",
+            "Parent",
+            "GUID",
+            "MailingName",
+            "Address",
+            "StateName",
+            "CountryName",
+            "Pincode",
+            "Email",
+            "LedgerPhone",
+            "IncomeTaxNumber",
+            "PartyGSTIN",
+            "GSTRegistrationType",
+            "OpeningBalance",
+            "IsBillWiseOn",
+            "BillCreditPeriod",
+            "BankAccountNumber",
+            "IFSCode",
+            "BankName",
+            "BankAccountHolder",
+            "SwiftCode",
+            "BranchName",
+            "CurrencyName",
+        ] {
+            XmlBuilder::write_text_node(&mut writer, "FETCH", field)?;
+        }
+        XmlBuilder::write_end_tag(&mut writer, "COLLECTION")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
+
+        XmlBuilder::finish_writer(writer)
+    }
+
+    pub fn create_stock_item_export_request(current_company: Option<&str>) -> Result<String> {
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+        XmlBuilder::write_export_envelope_header(
+            &mut writer,
+            "EXPORT",
+            "COLLECTION",
+            "CustomStockItemCollection",
+        )?;
+        XmlBuilder::write_start_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_start_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_start_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_text_node(&mut writer, "SVEXPORTFORMAT", "$$SysName:XML")?;
+        XmlBuilder::write_current_company_tag(&mut writer, current_company)?;
+        XmlBuilder::write_end_tag(&mut writer, "STATICVARIABLES")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_start_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_start_tag_with_attrs(
+            &mut writer,
+            "COLLECTION",
+            &[
+                ("NAME", "CustomStockItemCollection"),
+                ("ISMODIFY", "No"),
+                ("ISFIXED", "No"),
+                ("ISINITIALIZE", "No"),
+                ("ISOPTION", "No"),
+                ("ISINTERNAL", "No"),
+                ("FETCHALLFIELDS", "Yes"),
+            ],
+        )?;
+        XmlBuilder::write_text_node(&mut writer, "TYPE", "Stock Item")?;
+        XmlBuilder::write_text_node(&mut writer, "NATIVEMETHOD", "*, *.*")?;
+        for field in [
+            "Name",
+            "Parent",
+            "GUID",
+            "BaseUnits",
+            "AdditionalUnits",
+            "GSTApplicable",
+            "GSTTypeOfSupply",
+            "GSTHSNName",
+            "GSTHSNDescription",
+            "GSTTaxability",
+            "GSTRate",
+            "OpeningRate",
+            "OpeningBalance",
+        ] {
+            XmlBuilder::write_text_node(&mut writer, "FETCH", field)?;
+        }
+        XmlBuilder::write_end_tag(&mut writer, "COLLECTION")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDLMESSAGE")?;
+        XmlBuilder::write_end_tag(&mut writer, "TDL")?;
+        XmlBuilder::write_end_tag(&mut writer, "DESC")?;
+        XmlBuilder::write_end_tag(&mut writer, "BODY")?;
+        XmlBuilder::write_end_tag(&mut writer, "ENVELOPE")?;
+
+        XmlBuilder::finish_writer(writer)
+    }
+
     pub fn create_builtin_report_request(
         report_name: &str,
         from_date: Option<&str>,
