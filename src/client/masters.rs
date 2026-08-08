@@ -72,12 +72,13 @@ impl TallyClient {
         Ok(extract_currencies_from_xml(&resp))
     }
 
-    fn execute_create_request(&self, xml: &str) -> Result<ImportResult> {
+    /// Shared by masters + vouchers create helpers.
+    pub(super) fn execute_create_request(&self, xml: &str) -> Result<ImportResult> {
         let resp = self.post_xml(xml)?;
         Ok(parse::parse_simple_response_public(&resp))
     }
 
-    fn execute_debug_create_request(&self, xml: &str) -> Result<ImportResult> {
+    pub(super) fn execute_debug_create_request(&self, xml: &str) -> Result<ImportResult> {
         let prepared = self.prepare_request_xml(xml)?;
         println!(
             "\n================ XML Request ================\nPOST {}\nContent-Type: text/xml\n\n{}\n============================================\n",

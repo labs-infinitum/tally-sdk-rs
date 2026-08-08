@@ -26,7 +26,9 @@ impl XmlBuilder {
             .and_then(|v| v.as_str())
             .unwrap_or("Accounting Voucher View");
 
-        XmlBuilder::create_all_masters_import_request(|writer| {
+        // Use the Vouchers import report (not All Masters) — matches Tally sample
+        // Payment/Receipt XML and reduces silent Import Exceptions.
+        XmlBuilder::create_import_data_request("Vouchers", |writer| {
             XmlBuilder::write_start_tag_with_attrs(
                 writer,
                 "VOUCHER",
