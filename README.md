@@ -300,13 +300,23 @@ Set `TALLY_HOST`, `TALLY_PORT`, and optionally `TALLY_COMPANY` when running igno
 
 ## Releases
 
-Publishing to crates.io is automated by GitHub Actions:
+Preferred path: run the **Create Release** workflow from the Actions tab.
 
-1. Add a `CARGO_REGISTRY_TOKEN` secret to the repository (from [crates.io](https://crates.io/settings/tokens)).
-2. Ensure `version` in `Cargo.toml` matches the release.
-3. Tag and push, for example `git tag v0.1.0 && git push origin v0.1.0`.
+1. Add a `CARGO_REGISTRY_TOKEN` secret (from [crates.io](https://crates.io/settings/tokens)).
+2. Choose a bump type:
+   - `bugfix` → `x.y.z` → `x.y.(z+1)`
+   - `minor` → `x.y.z` → `x.(y+1).0`
+   - `major` → `x.y.z` → `(x+1).0.0`
+3. Create Release updates `Cargo.toml` / `Cargo.lock`, commits, and tags `vX.Y.Z`.
+4. It then dispatches the **Release** workflow, which publishes that tag to crates.io.
 
-The release workflow also supports manual `workflow_dispatch`. The tag must be `vX.Y.Z` and must match the `Cargo.toml` version.
+You can still publish by pushing a tag yourself:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The **Release** workflow also supports manual `workflow_dispatch` for publish-only / dry-run retries.
 
 ## Limitations
 

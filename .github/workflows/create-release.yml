@@ -1,0 +1,160 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "How to bump the Cargo.toml version"
+        required: true
+        type: choice
+        options:
+          - bugfix
+          - minor
+          - major
+      dry_run:
+        description: "Compute the next version without committing or tagging"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Bump version and tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version
+        id: bump
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+        run: |
+          set -euo pipefail
+
+          old_version="$(sed -n 's/^version = "\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"/\1/p' Cargo.toml | head -n1)"
+          if [ -z "$old_version" ]; then
+            echo "Could not read version from Cargo.toml"
+            exit 1
+          fi
+
+          IFS=. read -r major minor patch <<< "$old_version"
+
+          case "$RELEASE_TYPE" in
+            bugfix)
+              patch=$((patch + 1))
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            *)
+              echo "Unknown release type: $RELEASE_TYPE"
+              exit 1
+              ;;
+          esac
+
+          new_version="${major}.${minor}.${patch}"
+          tag="v${new_version}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists"
+            exit 1
+          fi
+
+          echo "old_version=$old_version" >> "$GITHUB_OUTPUT"
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          echo "Current version: $old_version"
+          echo "Release type:    $RELEASE_TYPE"
+          echo "Next version:    $new_version"
+          echo "Tag:             $tag"
+
+      - name: Update Cargo.toml and Cargo.lock
+        if: inputs.dry_run != 'true'
+        env:
+          OLD_VERSION: ${{ steps.bump.outputs.old_version }}
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          sed -i "0,/^version = \"${OLD_VERSION}\"/s//version = \"${NEW_VERSION}\"/" Cargo.toml
+          if grep -q "^name = \"tallyprime-sdk\"$" Cargo.lock; then
+            # Update only the root package version entry in the lockfile.
+            awk -v new="$NEW_VERSION" '
+              BEGIN { in_pkg=0; updated=0 }
+              /^\[\[package\]\]$/ { in_pkg=0 }
+              /^name = "tallyprime-sdk"$/ { in_pkg=1 }
+              in_pkg && /^version = "/ && updated==0 {
+                print "version = \"" new "\""
+                updated=1
+                next
+              }
+              { print }
+            ' Cargo.lock > Cargo.lock.tmp
+            mv Cargo.lock.tmp Cargo.lock
+          fi
+          grep -n '^version = ' Cargo.toml | head -n1
+          grep -A2 '^name = "tallyprime-sdk"$' Cargo.lock | head -n3
+
+      - name: Commit, tag, and push
+        if: inputs.dry_run != 'true'
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add Cargo.toml Cargo.lock
+          git commit -m "Release ${TAG}"
+          git tag -a "$TAG" -m "Release ${TAG}"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+          git push origin "$TAG"
+
+      - name: Trigger Release workflow
+        if: inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Tag pushes made with GITHUB_TOKEN do not start other workflows, so
+          # explicitly dispatch the existing Release workflow on the new tag.
+          gh workflow run Release.yml --ref "$TAG" -f dry_run=false
+          echo "Dispatched Release workflow for $TAG"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Create Release"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Current | \`${{ steps.bump.outputs.old_version }}\` |"
+            echo "| Type | \`${{ inputs.release_type }}\` |"
+            echo "| Next | \`${{ steps.bump.outputs.new_version }}\` |"
+            echo "| Tag | \`${{ steps.bump.outputs.tag }}\` |"
+            echo "| Dry run | \`${{ inputs.dry_run }}\` |"
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              echo ""
+              echo "The **Release** workflow was dispatched to publish \`${{ steps.bump.outputs.tag }}\` to crates.io."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
