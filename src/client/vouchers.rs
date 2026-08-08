@@ -1,9 +1,34 @@
 use super::{voucher_parser, TallyClient};
 use crate::errors::Result;
-use crate::models::{CurrencySummary, ForexDetails, Voucher};
+use crate::models::{CurrencySummary, ForexDetails, ImportResult, Voucher};
 use crate::xml_builder::XmlBuilder;
 
 impl TallyClient {
+    /// Create an accounting voucher (Payment, Receipt, Journal, etc.) in Tally.
+    pub fn create_voucher(&self, voucher: &Voucher) -> Result<ImportResult> {
+        Ok(self.create_voucher_with_response(voucher)?.0)
+    }
+
+    /// Create a voucher and return the raw Tally XML response (for diagnostics).
+    pub fn create_voucher_with_response(
+        &self,
+        voucher: &Voucher,
+    ) -> Result<(ImportResult, String)> {
+        voucher.validate()?;
+        let map = voucher.to_map();
+        let xml = XmlBuilder::create_voucher_request(&map)?;
+        let resp = self.post_xml(&xml)?;
+        Ok((super::parse::parse_simple_response_public(&resp), resp))
+    }
+
+    /// Same as [`Self::create_voucher`], but prints the XML request/response.
+    pub fn create_voucher_debug(&self, voucher: &Voucher) -> Result<ImportResult> {
+        voucher.validate()?;
+        let map = voucher.to_map();
+        let xml = XmlBuilder::create_voucher_request(&map)?;
+        self.execute_debug_create_request(&xml)
+    }
+
     /// Fetch vouchers from Tally server
     ///
     /// # Arguments

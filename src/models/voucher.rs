@@ -84,18 +84,22 @@ impl VoucherEntry {
         use serde_json::json;
         let mut m = serde_json::Map::new();
         m.insert("LEDGERNAME".into(), json!(self.ledger_name.clone()));
+        // Tally import convention: debit = ISDEEMEDPOSITIVE=Yes + negative AMOUNT;
+        // credit = ISDEEMEDPOSITIVE=No + positive AMOUNT.
         m.insert(
             "ISDEEMEDPOSITIVE".into(),
-            json!(if self.is_debit { "No" } else { "Yes" }),
+            json!(if self.is_debit { "Yes" } else { "No" }),
         );
         m.insert(
             "ISPARTYLEDGER".into(),
             json!(if self.is_party_ledger { "Yes" } else { "No" }),
         );
+        // Tally imports are more reliable with fixed 2-decimal string amounts
+        // (matches working Payment/Receipt XML samples).
         let amt = if self.is_debit {
-            self.amount
+            format!("-{:.2}", self.amount.abs())
         } else {
-            -self.amount.abs()
+            format!("{:.2}", self.amount.abs())
         };
         m.insert("AMOUNT".into(), json!(amt));
         m
@@ -182,7 +186,18 @@ impl Voucher {
         use serde_json::{json, Value};
         let mut m = serde_json::Map::new();
         m.insert("VOUCHERTYPENAME".into(), json!(self.voucher_type.clone()));
+        m.insert("OBJVIEW".into(), json!("Accounting Voucher View"));
+        m.insert("PERSISTEDVIEW".into(), json!("Accounting Voucher View"));
+        m.insert("ISINVOICE".into(), json!(if self.is_invoice { "Yes" } else { "No" }));
         m.insert("DATE".into(), json!(self.date_yyyymmdd.clone()));
+        m.insert(
+            "EFFECTIVEDATE".into(),
+            json!(
+                self.effective_date
+                    .clone()
+                    .unwrap_or_else(|| self.date_yyyymmdd.clone())
+            ),
+        );
         if let Some(n) = &self.narration {
             m.insert("NARRATION".into(), json!(n));
         }
@@ -200,7 +215,8 @@ impl Voucher {
             .iter()
             .map(|e| Value::Object(e.to_map()))
             .collect();
-        m.insert("LEDGERENTRIES.LIST".into(), Value::Array(arr));
+        // Accounting Payment/Receipt samples typically use ALLLEDGERENTRIES.LIST.
+        m.insert("ALLLEDGERENTRIES.LIST".into(), Value::Array(arr));
         m
     }
 }
