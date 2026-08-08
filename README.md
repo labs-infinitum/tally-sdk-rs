@@ -302,13 +302,13 @@ Set `TALLY_HOST`, `TALLY_PORT`, and optionally `TALLY_COMPANY` when running igno
 
 Preferred path: run the **Create Release** workflow from the Actions tab.
 
-1. Add a `CARGO_REGISTRY_TOKEN` secret (from [crates.io](https://crates.io/settings/tokens)).
+1. Configure [Trusted Publishing](https://crates.io/docs/trusted-publishing) on crates.io for this repo, with workflow `release.yml`.
 2. Choose a bump type:
    - `bugfix` → `x.y.z` → `x.y.(z+1)`
    - `minor` → `x.y.z` → `x.(y+1).0`
    - `major` → `x.y.z` → `(x+1).0.0`
 3. Create Release updates `Cargo.toml` / `Cargo.lock`, commits to `main`, and tags `vX.Y.Z`.
-4. It then dispatches the **Release** workflow, which publishes that tag to crates.io.
+4. It then dispatches the **Release** workflow, which publishes that tag to crates.io via OIDC (no `CARGO_REGISTRY_TOKEN` secret).
 
 You can still publish by pushing a tag yourself:
 
